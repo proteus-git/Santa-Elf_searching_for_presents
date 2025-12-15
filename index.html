@@ -3,7 +3,10 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>サンタとエルフのプレゼント探し</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&display=swap');
@@ -27,7 +30,10 @@
             overflow: hidden;
             font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
             touch-action: none;
+            touch-action: none;
             /* Prevent browser zooming/scrolling */
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
 
         /* 16:9 Container */
