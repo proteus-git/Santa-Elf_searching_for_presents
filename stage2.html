@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>サンタとエルフのプレゼント配り (Stage 2)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&display=swap');
+
+        :root {
+            --bg-main: #000033;
+            --z-base: 10;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-main);
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
+            touch-action: none;
+        }
+
+        /* 16:9 Container */
+        #game-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100vw;
+            height: 56.25vw;
+            max-height: 100vh;
+            max-width: 177.78vh;
+            background: #000;
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+        }
+
+        /* Game Objects */
+        .game-object {
+            position: absolute;
+            touch-action: none;
+            user-select: none;
+            transform-origin: center bottom;
+            transition: transform 0.1s;
+        }
+
+        .game-object img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        /* Santa Group (No Sway) */
+        .santa-group {
+            position: absolute;
+            pointer-events: none;
+            z-index: 2000;
+            transform-origin: center center;
+        }
+
+        .santa-group img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* Alive Animation (Randomized in JS) */
+        @keyframes sway {
+            0% {
+                transform: rotate(-15deg);
+            }
+
+            50% {
+                transform: rotate(15deg);
+            }
+
+            100% {
+                transform: rotate(-15deg);
+            }
+        }
+
+        /* Inventory (Red Bag) */
+        #inventory {
+            position: absolute;
+            top: 50%;
+            left: -300px;
+            /* Hidden initially */
+            transform: translateY(-50%);
+            width: 250px;
+            height: 300px;
+            background: url('images/サンタのあかい袋.png') no-repeat center center;
+            background-size: contain;
+            padding: 40px 20px 20px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-content: center;
+            gap: 10px;
+            transition: left 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 3000;
+            filter: drop-shadow(5px 5px 15px rgba(0, 0, 0, 0.5));
+        }
+
+        #inventory.show {
+            left: -50px;
+        }
+
+        .inv-item {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            cursor: grab;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.1s;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .inv-item:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+
+        .inv-item img {
+            width: 80%;
+            height: 80%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        /* Dragging Ghost */
+        .ghost {
+            position: absolute;
+            pointer-events: none;
+            z-index: 9999;
+            width: 80px;
+            height: 80px;
+        }
+
+        .ghost img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* Happy Animation */
+        @keyframes happyJump {
+
+            0%,
+            100% {
+                transform: translateY(0) scale(1);
+            }
+
+            50% {
+                transform: translateY(-30px) scale(1.2);
+            }
+        }
+
+        .happy-anim {
+            animation: happyJump 0.5s ease-in-out 3;
+        }
+
+        /* Message */
+        #message-area {
+            position: absolute;
+            top: 10%;
+            width: 100%;
+            text-align: center;
+            font-family: 'Mountains of Christmas', cursive;
+            font-size: 40px;
+            color: #ffeb3b;
+            text-shadow: 2px 2px 4px #000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 4000;
+        }
+
+        /* Gift Overlay */
+        #gift-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 5000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        #gift-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .overlay-content {
+            position: relative;
+            width: 80%;
+            max-width: 800px;
+            height: 60%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 50px;
+            transform: scale(0.5);
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #gift-overlay.show .overlay-content {
+            transform: scale(1.2);
+        }
+
+        .overlay-char {
+            height: 25vw;
+            max-height: 300px;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.5));
+            transition: transform 0.5s;
+        }
+
+        .flip-h {
+            transform: scaleX(-1);
+        }
+
+        #overlay-box {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            z-index: 5001;
+            transition: all 0.8s ease-in-out;
+        }
+
+        #overlay-gift-content {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            z-index: 5002;
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* --- New Visual Effects --- */
+
+        /* Snow */
+        .snow {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0.8;
+            box-shadow: 0 0 10px white;
+            z-index: 5;
+        }
+
+        /* Stars */
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 2s infinite alternate;
+            z-index: 1;
+        }
+
+        @keyframes twinkle {
+            from {
+                opacity: 0.3;
+                transform: scale(0.8);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+
+        /* Shooting Star (Enhanced) */
+        .shooting-star {
+            position: absolute;
+            width: 6px;
+            /* Larger */
+            height: 6px;
+            /* Larger */
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #fff, 0 0 30px #fff, 0 0 60px #fff;
+            /* Stronger glow */
+            pointer-events: none;
+            z-index: 1500;
+            opacity: 0;
+            animation: shoot 1s linear forwards;
+        }
+
+        @keyframes shoot {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            100% {
+                opacity: 0;
+                transform: scale(0.5) translate(-150px, 75px);
+                /* Longer trail */
+            }
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: absolute;
+            background: #fff;
+            border-radius: 20px;
+            padding: 10px 15px;
+            font-family: 'Mountains of Christmas', cursive;
+            font-size: 18px;
+            color: #333;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            white-space: nowrap;
+            z-index: 4000;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 10px 10px 0;
+            border-style: solid;
+            border-color: #fff transparent transparent transparent;
+        }
+
+        .speech-bubble.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Gift on Head */
+        .head-gift {
+            position: absolute;
+            top: -30%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            /* Relative to animal size */
+            height: auto;
+            z-index: 20;
+            filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.3));
+            pointer-events: none;
+        }
+
+        /* Sound Controls */
+        #sound-controls {
+            position: absolute;
+            top: 2%;
+            right: 2%;
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+            z-index: 6000;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: clamp(40px, 6vh, 60px);
+            height: clamp(40px, 6vh, 60px);
+            font-size: clamp(20px, 3vh, 30px);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Santa Finale Message (Glitter & Fullscreen) */
+        #santa-msg {
+            position: absolute;
+            font-family: 'Mountains of Christmas', cursive;
+            font-weight: bold;
+            color: #fff;
+            text-align: center;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5500;
+            transition: all 0.5s ease-out;
+
+            /* Glitter Effect */
+            background: linear-gradient(to right, #FFF 20%, #FFD700 40%, #FFD700 60%, #FFF 80%);
+            background-size: 200% auto;
+            color: #000;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shine 2s linear infinite;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        @keyframes shine {
+            to {
+                background-position: 200% center;
+            }
+        }
+
+        .msg-fullscreen {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(4);
+            /* Huge */
+            opacity: 1 !important;
+        }
+
+        .msg-following {
+            transform: translate(-50%, -100%) scale(1);
+            /* Normal size above Santa */
+            opacity: 1 !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <img id="bg" src="images/nightsnow-coveredtreehouse.webp.png" alt="Background">
+        <div id="star-layer" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:1;"></div>
+
+        <!-- Game Area -->
+        <div id="game-area" style="position: absolute; top:0; left:0; width:100%; height:100%; z-index: 10;"></div>
+
+        <!-- Santa Group -->
+        <div id="reindeer" class="santa-group" style="width: 100px; height: 100px;"><img src="images/reindeer2.png">
+        </div>
+        <div id="sleigh" class="santa-group" style="width: 120px; height: 120px;"><img src="images/sleigh2.png"></div>
+        <div id="santa" class="santa-group" style="width: 100px; height: 100px;">
+            <img src="images/santa2.png">
+        </div>
+
+        <!-- Finale Message (Independent) -->
+        <div id="santa-msg">Merry Christmas!</div>
+
+        <!-- Inventory -->
+        <div id="inventory">
+            <!-- Items will be injected here -->
+        </div>
+
+        <!-- Sound Controls -->
+        <div id="sound-controls">
+            <button class="btn" id="bgm-btn">🔇</button>
+        </div>
+
+        <!-- Gift Overlay -->
+        <div id="gift-overlay">
+            <div class="overlay-content">
+                <!-- Santa on Left -->
+                <img id="overlay-santa" class="overlay-char" src="images/santa2you.png">
+                <!-- Animal on Right -->
+                <img id="overlay-animal" class="overlay-char" src="">
+
+                <!-- Animated Props -->
+                <img id="overlay-box" src="images/presentBox.png" style="opacity: 0;">
+                <img id="overlay-gift-content" src="" style="opacity: 0;">
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Audio -->
+    <audio id="bgm" src="audio/christmas-song.mp3" loop></audio>
+
+    <script>
+        const ASSETS = {
+            animals: [
+                { id: "squirrel", name: "リス", imgs: ["images/リス横.png", "images/リスばんざい.png", "images/リス正面.png"], giftId: "acorn", pos: { x: 20, y: 30 } },
+                { id: "rabbit", name: "ウサギ", imgs: ["images/ウサギ.png", "images/ウサギばんざい.png", "images/ウサギ正面.png"], giftId: "carrot", pos: { x: 40, y: 65 } },
+                { id: "giraffe", name: "キリン", imgs: ["images/キリン横.png", "images/キリン後ろ.png"], giftId: "muffler", pos: { x: 80, y: 50 } },
+                { id: "lion", name: "ライオン", imgs: ["images/Lion.png", "images/LionSmile.png"], giftId: "crown", pos: { x: 60, y: 65 } },
+                { id: "crocodile", name: "ワニ", imgs: ["images/ワニ.png", "images/ワニ笑い.png"], giftId: "toothbrush", pos: { x: 10, y: 70 } }
+            ],
+            gifts: [
+                { id: "acorn", src: "images/どんぐり.png" },
+                { id: "carrot", src: "images/にんじん.png" },
+                { id: "muffler", src: "images/マフラー.png" },
+                { id: "crown", src: "images/王冠.png" },
+                { id: "toothbrush", src: "images/歯ブラシ.png" }
+            ],
+            box: "images/presentBox.png"
+        };
+
+        const container = document.getElementById('game-container');
+        const gameArea = document.getElementById('game-area');
+        const inventory = document.getElementById('inventory');
+        const starLayer = document.getElementById('star-layer');
+        const bgm = document.getElementById('bgm');
+        const bgmBtn = document.getElementById('bgm-btn');
+
+        // Santa Physics
+        let lastMousePos = { x: 0, y: 0 };
+        let reindeerPos = { x: -200, y: 100, angle: 0 };
+        let sleighPos = { x: -300, y: 100, angle: 0 };
+        let santaPos = { x: -400, y: 100, angle: 0 };
+
+        const reindeer = document.getElementById('reindeer');
+        const sleigh = document.getElementById('sleigh');
+        const santa = document.getElementById('santa');
+        const santaMsg = document.getElementById('santa-msg');
+
+        // Game State
+        let isBgmPlaying = false;
+        let allGiftsDelivered = false;
+        let finaleActive = false;
+        let followingSanta = false; // New state for text
+        let cumulativeRotation = 0;
+        let lastSantaAngle = 0;
+        let finaleScale = 1.0;
+
+        function init() {
+            const rect = container.getBoundingClientRect();
+            lastMousePos.x = rect.width / 2;
+            lastMousePos.y = rect.height / 2;
+
+            createStars();
+            startSnow();
+            spawnAnimalsSequence();
+
+            // Auto-play BGM (might be blocked by browser, but try)
+            bgm.volume = 0.3;
+            bgm.play().then(() => {
+                isBgmPlaying = true;
+                bgmBtn.textContent = '🎵';
+            }).catch(() => {
+                isBgmPlaying = false;
+                bgmBtn.textContent = '🔇';
+            });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Audio Control ---
+        bgmBtn.onclick = () => {
+            if (isBgmPlaying) {
+                bgm.pause();
+                isBgmPlaying = false;
+                bgmBtn.textContent = '🔇';
+            } else {
+                bgm.play();
+                isBgmPlaying = true;
+                bgmBtn.textContent = '🎵';
+            }
+        };
+
+        // --- Visual Effects ---
+        function createStars() {
+            for (let i = 0; i < 50; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                const size = 2 + Math.random() * 3;
+                star.style.width = size + 'px';
+                star.style.height = size + 'px';
+                star.style.animationDelay = Math.random() * 2 + 's';
+                starLayer.appendChild(star);
+            }
+        }
+
+        function startSnow() {
+            setInterval(() => {
+                const snow = document.createElement('div');
+                snow.className = 'snow';
+                snow.style.left = Math.random() * 100 + '%';
+                snow.style.top = '-10px';
+                const size = 5 + Math.random() * 8;
+                snow.style.width = size + 'px';
+                snow.style.height = size + 'px';
+
+                const duration = 5 + Math.random() * 5;
+                snow.style.transition = `top ${duration}s linear, opacity ${duration}s ease-in`;
+
+                gameArea.appendChild(snow);
+
+                requestAnimationFrame(() => {
+                    snow.style.top = '100%';
+                    snow.style.opacity = '0.2';
+                });
+
+                setTimeout(() => snow.remove(), duration * 1000);
+            }, 200);
+        }
+
+        function createShootingStar() {
+            // Increase frequency during finale
+            const chance = finaleActive ? 0.2 : 0.05;
+            if (Math.random() > chance) return;
+
+            const star = document.createElement('div');
+            star.className = 'shooting-star';
+
+            // Spawn near Santa/Sleigh
+            const offsetX = (Math.random() - 0.5) * 50;
+            const offsetY = (Math.random() - 0.5) * 50;
+
+            star.style.left = (santaPos.x + 50 + offsetX) + 'px';
+            star.style.top = (santaPos.y + 50 + offsetY) + 'px';
+
+            container.appendChild(star);
+
+            setTimeout(() => star.remove(), 1000);
+        }
+
+        // --- Animal Entrance Sequence ---
+        async function spawnAnimalsSequence() {
+            const doorX = 50;
+            const doorY = 45;
+
+            for (let i = 0; i < ASSETS.animals.length; i++) {
+                const animal = ASSETS.animals[i];
+                const el = document.createElement('div');
+                el.className = 'game-object';
+                el.dataset.id = animal.id;
+                el.dataset.giftId = animal.giftId;
+
+                el.style.left = doorX + '%';
+                el.style.top = doorY + '%';
+                el.style.width = '0px';
+                el.style.height = '0px';
+                el.style.opacity = '0';
+                el.style.zIndex = 100 + i;
+
+                const imgSrc = animal.imgs[0];
+                el.innerHTML = `<img src="${imgSrc}" draggable="false">`;
+                gameArea.appendChild(el);
+
+                await new Promise(r => setTimeout(r, 500));
+
+                el.style.transition = 'all 1s ease-out';
+                el.style.width = '60px';
+                el.style.height = '60px';
+                el.style.opacity = '1';
+                el.offsetHeight;
+
+                el.style.left = animal.pos.x + '%';
+                el.style.top = animal.pos.y + '%';
+
+                await new Promise(r => setTimeout(r, 800));
+
+                startSway(el);
+            }
+
+            setTimeout(initInventory, 500);
+        }
+
+        function startSway(el) {
+            const duration = 1.5 + Math.random();
+            const delay = Math.random();
+            el.style.animation = `sway ${duration}s infinite ease-in-out alternate ${delay}s`;
+        }
+
+        // --- Inventory System ---
+        function initInventory() {
+            ASSETS.gifts.forEach(gift => {
+                const item = document.createElement('div');
+                item.className = 'inv-item';
+                item.dataset.id = gift.id;
+                item.innerHTML = `<img src="${gift.src}" draggable="false">`;
+                setupDrag(item, gift);
+                inventory.appendChild(item);
+            });
+            inventory.classList.add('show');
+        }
+
+        // --- Drag & Drop Logic ---
+        function setupDrag(el, giftData) {
+            let isDragging = false;
+            let ghost = null;
+            let dragOffset = { x: 0, y: 0 };
+
+            const onStart = (e) => {
+                if (e.type === 'mousedown' && e.button !== 0) return;
+                e.preventDefault();
+
+                isDragging = true;
+                const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+                const rect = el.getBoundingClientRect();
+
+                dragOffset.x = clientX - rect.left;
+                dragOffset.y = clientY - rect.top;
+
+                ghost = document.createElement('div');
+                ghost.className = 'ghost';
+                ghost.innerHTML = `<img src="${ASSETS.box}">`;
+
+                ghost.style.left = (clientX - dragOffset.x) + 'px';
+                ghost.style.top = (clientY - dragOffset.y) + 'px';
+
+                document.body.appendChild(ghost);
+                el.style.opacity = '0.3';
+
+                if (e.type === 'mousedown') {
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onEnd);
+                } else {
+                    document.addEventListener('touchmove', onMove, { passive: false });
+                    document.addEventListener('touchend', onEnd);
+                }
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+
+                if (ghost) {
+                    ghost.style.left = (clientX - dragOffset.x) + 'px';
+                    ghost.style.top = (clientY - dragOffset.y) + 'px';
+                }
+            };
+
+            const onEnd = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                el.style.opacity = '1';
+
+                if (ghost) {
+                    const ghostRect = ghost.getBoundingClientRect();
+                    const ghostCenter = {
+                        x: ghostRect.left + ghostRect.width / 2,
+                        y: ghostRect.top + ghostRect.height / 2
+                    };
+
+                    const animals = document.querySelectorAll('#game-area .game-object');
+                    let targetAnimal = null;
+
+                    animals.forEach(anim => {
+                        const r = anim.getBoundingClientRect();
+                        if (ghostCenter.x >= r.left && ghostCenter.x <= r.right &&
+                            ghostCenter.y >= r.top && ghostCenter.y <= r.bottom) {
+                            targetAnimal = anim;
+                        }
+                    });
+
+                    if (targetAnimal) {
+                        checkMatch(targetAnimal, giftData, ghost);
+                    } else {
+                        ghost.remove();
+                    }
+                    ghost = null;
+                }
+
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onEnd);
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('touchend', onEnd);
+            };
+
+            el.addEventListener('mousedown', onStart);
+            el.addEventListener('touchstart', onStart, { passive: false });
+        }
+
+        function checkMatch(animalEl, giftData, ghostEl) {
+            const requiredGift = animalEl.dataset.giftId;
+
+            if (giftData.id === requiredGift) {
+                ghostEl.remove();
+
+                const animalData = ASSETS.animals.find(a => a.id === animalEl.dataset.id);
+                let happyImgSrc = animalData.imgs[0];
+                if (animalData && animalData.imgs.length > 1) {
+                    happyImgSrc = animalData.imgs.find(src => src.includes('Smile') || src.includes('笑') || src.includes('banzai') || src.includes('ばんざい')) || animalData.imgs[1];
+                }
+
+                showGiftOverlay(animalEl, happyImgSrc, giftData);
+
+            } else {
+                ghostEl.remove();
+            }
+        }
+
+        function checkWin() {
+            const remaining = document.querySelectorAll('.inv-item:not([style*="display: none"])');
+            if (remaining.length === 0) {
+                allGiftsDelivered = true;
+                setTimeout(() => {
+                    showThankYouBubbles();
+                }, 1000);
+            }
+        }
+
+        function showThankYouBubbles() {
+            const animals = document.querySelectorAll('#game-area .game-object');
+            animals.forEach((anim, index) => {
+                setTimeout(() => {
+                    if (!anim.style.animation) {
+                        startSway(anim);
+                    }
+
+                    const bubble = document.createElement('div');
+                    bubble.className = 'speech-bubble';
+                    bubble.textContent = "Thank you Santa!";
+                    bubble.style.left = '50%';
+                    bubble.style.top = '-40px';
+                    bubble.style.transform = 'translateX(-50%) scale(0)';
+
+                    anim.appendChild(bubble);
+
+                    requestAnimationFrame(() => {
+                        bubble.classList.add('show');
+                    });
+
+                }, index * 300);
+            });
+
+            // Start Finale Tracking
+            finaleActive = true;
+            // Initialize last angle based on current Santa pos
+            const rect = container.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            lastSantaAngle = Math.atan2(santaPos.y - centerY, santaPos.x - centerX) * 180 / Math.PI;
+
+            // Show Fullscreen Message
+            setTimeout(() => {
+                santaMsg.classList.add('msg-fullscreen');
+            }, 2000);
+        }
+
+        // --- Santa Movement ---
+        container.addEventListener('mousemove', (e) => {
+            const rect = container.getBoundingClientRect();
+            lastMousePos.x = e.clientX - rect.left;
+            lastMousePos.y = e.clientY - rect.top;
+        });
+        container.addEventListener('touchmove', (e) => {
+            const rect = container.getBoundingClientRect();
+            lastMousePos.x = e.touches[0].clientX - rect.left;
+            lastMousePos.y = e.touches[0].clientY - rect.top;
+        });
+
+        function gameLoop() {
+            const reindeerLerp = 0.1;
+            const sleighLerp = 0.05;
+            const santaLerp = 0.03;
+
+            reindeerPos.x += (lastMousePos.x - reindeerPos.x - 50) * reindeerLerp;
+            reindeerPos.y += (lastMousePos.y - reindeerPos.y - 50) * reindeerLerp;
+            const rAngle = Math.atan2(lastMousePos.y - reindeerPos.y - 50, lastMousePos.x - reindeerPos.x - 50) * 180 / Math.PI;
+            reindeerPos.angle = rAngle;
+
+            sleighPos.x += (reindeerPos.x - sleighPos.x) * sleighLerp;
+            sleighPos.y += (reindeerPos.y - sleighPos.y) * sleighLerp;
+            const sAngle = Math.atan2(reindeerPos.y - sleighPos.y, reindeerPos.x - sleighPos.x) * 180 / Math.PI;
+
+            santaPos.x += (sleighPos.x - santaPos.x) * santaLerp;
+            santaPos.y += (sleighPos.y - santaPos.y) * santaLerp;
+            const stAngle = Math.atan2(sleighPos.y - santaPos.y, sleighPos.x - santaPos.x) * 180 / Math.PI;
+
+            const maxDist = 500;
+            const minScale = 0.5;
+            const maxScale = 1.0;
+
+            const rDx = lastMousePos.x - (reindeerPos.x + 50);
+            const rDy = lastMousePos.y - (reindeerPos.y + 50);
+            const rDist = Math.sqrt(rDx * rDx + rDy * rDy);
+            let rScale = Math.max(minScale, maxScale - (rDist / maxDist) * 0.5);
+
+            const sDx = reindeerPos.x - sleighPos.x;
+            const sDy = reindeerPos.y - sleighPos.y;
+            const sDist = Math.sqrt(sDx * sDx + sDy * sDy);
+            let sScale = Math.max(minScale, maxScale - (sDist / maxDist) * 0.6);
+
+            const stDx = sleighPos.x - santaPos.x;
+            const stDy = sleighPos.y - santaPos.y;
+            const stDist = Math.sqrt(stDx * stDx + stDy * stDy);
+            let stScale = Math.max(minScale, maxScale - (stDist / maxDist) * 0.7);
+
+            // Apply Finale Scale
+            if (finaleActive) {
+                checkFinale();
+                rScale *= finaleScale;
+                sScale *= finaleScale;
+                stScale *= finaleScale;
+            }
+
+            // Update Text Position if Following
+            if (followingSanta) {
+                santaMsg.style.left = (santaPos.x + 50) + 'px';
+                santaMsg.style.top = santaPos.y + 'px';
+            }
+
+            reindeer.style.transform = `translate(${reindeerPos.x}px, ${reindeerPos.y}px) rotate(${rAngle}deg) scale(${rScale})`;
+            sleigh.style.transform = `translate(${sleighPos.x}px, ${sleighPos.y}px) rotate(${sAngle}deg) scale(${sScale})`;
+            santa.style.transform = `translate(${santaPos.x}px, ${santaPos.y}px) rotate(${stAngle}deg) scale(${stScale})`;
+
+            createShootingStar();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function checkFinale() {
+            const rect = container.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+
+            // Calculate current angle of Santa relative to center
+            const currentAngle = Math.atan2(santaPos.y - centerY, santaPos.x - centerX) * 180 / Math.PI;
+
+            // Calculate delta
+            let delta = currentAngle - lastSantaAngle;
+
+            // Handle wrap around (-180 to 180)
+            if (delta > 180) delta -= 360;
+            if (delta < -180) delta += 360;
+
+            // Only count if moving somewhat significantly (avoid jitter)
+            if (Math.abs(delta) > 0.5) {
+                cumulativeRotation += Math.abs(delta);
+                lastSantaAngle = currentAngle;
+
+                // Start following if rotation starts
+                if (!followingSanta && cumulativeRotation > 10) {
+                    followingSanta = true;
+                    santaMsg.classList.remove('msg-fullscreen');
+                    santaMsg.classList.add('msg-following');
+                }
+            }
+
+            // Shrink Logic (Target: 5 rotations = 1800 degrees)
+            const targetRotation = 1800;
+            const progress = Math.min(cumulativeRotation / targetRotation, 1);
+
+            finaleScale = 1.0 - progress;
+
+            if (finaleScale <= 0.05) {
+                finaleScale = 0;
+                // End Game / Fade Out
+                container.style.transition = 'opacity 2s';
+                container.style.opacity = '0';
+            }
+        }
+
+        init();
+
+        function showGiftOverlay(animalEl, happyImgSrc, giftData) {
+            const overlay = document.getElementById('gift-overlay');
+            const ovSanta = document.getElementById('overlay-santa');
+            const ovAnimal = document.getElementById('overlay-animal');
+            const ovBox = document.getElementById('overlay-box');
+            const ovGift = document.getElementById('overlay-gift-content');
+
+            ovSanta.src = "images/santa2you.png";
+            ovAnimal.src = animalEl.querySelector('img').src;
+            ovGift.src = giftData.src;
+
+            ovSanta.className = 'overlay-char flip-h';
+            ovAnimal.className = 'overlay-char';
+
+            ovBox.style.opacity = '1';
+            ovBox.style.left = '35%';
+            ovBox.style.top = '50%';
+            ovBox.style.transform = 'translate(-50%, -50%) scale(1)';
+
+            ovGift.style.opacity = '0';
+            ovGift.style.left = '65%';
+            ovGift.style.top = '50%';
+            ovGift.style.transform = 'translate(-50%, -50%) scale(0.5)';
+
+            overlay.style.display = 'flex';
+            overlay.offsetHeight;
+            overlay.classList.add('show');
+
+            setTimeout(() => {
+                ovBox.style.left = '65%';
+            }, 100);
+
+            setTimeout(() => {
+                ovAnimal.src = happyImgSrc;
+                ovBox.style.opacity = '0';
+                ovGift.style.opacity = '1';
+                ovGift.style.top = '20%';
+                ovGift.style.transform = 'translate(-50%, -50%) scale(1.5)';
+            }, 900);
+
+            setTimeout(() => {
+                closeOverlay(animalEl, giftData, happyImgSrc);
+            }, 3000);
+        }
+
+        function closeOverlay(animalEl, giftData, happyImgSrc) {
+            const overlay = document.getElementById('gift-overlay');
+            overlay.classList.remove('show');
+
+            setTimeout(() => {
+                overlay.style.display = 'none';
+
+                startSway(animalEl);
+
+                animalEl.querySelector('img').src = happyImgSrc;
+
+                // Add Gift on Head
+                const headGift = document.createElement('img');
+                headGift.src = giftData.src;
+                headGift.className = 'head-gift';
+                animalEl.appendChild(headGift);
+
+                const invItem = document.querySelector(`.inv-item[data-id="${giftData.id}"]`);
+                if (invItem) invItem.style.display = 'none';
+
+                checkWin();
+
+            }, 500);
+        }
+
+    </script>
+</body>
+
+</html>

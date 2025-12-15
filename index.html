@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>サンタとエルフのプレゼント探し</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&display=swap');
+
+        :root {
+            --bg-main: #e1f6fa;
+            --palette-bg: rgba(255, 255, 255, 0.9);
+            --palette-border: #e1c784;
+            --item-border: #bbb;
+            --palette-height: 80px;
+            --z-base: 10;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-main);
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
+            touch-action: none;
+            /* Prevent browser zooming/scrolling */
+        }
+
+        /* 16:9 Container */
+        #game-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100vw;
+            height: 56.25vw;
+            /* 16:9 aspect ratio */
+            max-height: 100vh;
+            max-width: 177.78vh;
+            /* 16:9 aspect ratio */
+            background: #fff;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+        }
+
+        /* UI Overlay */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .header {
+            position: absolute;
+            top: 2%;
+            left: 2%;
+            padding: 1% 2%;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            font-size: clamp(16px, 2.5vh, 32px);
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            pointer-events: auto;
+        }
+
+        #merry-christmas-tag {
+            position: absolute;
+            font-family: 'Mountains of Christmas', cursive;
+            font-size: 40px;
+            color: #ff4757;
+            text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 1004;
+            display: none;
+            transform-origin: center center;
+        }
+
+
+
+        #find-indicator {
+            position: absolute;
+            top: 12%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.5);
+            padding: 1% 3%;
+            border-radius: 15px;
+            font-size: clamp(14px, 2vh, 24px);
+            color: #157578;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        #target-thumb {
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        #target-thumb:active {
+            transform: scale(0.9);
+        }
+
+        #sound-controls {
+            position: absolute;
+            top: 2%;
+            right: 2%;
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: clamp(40px, 6vh, 60px);
+            height: clamp(40px, 6vh, 60px);
+            font-size: clamp(20px, 3vh, 30px);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Inventory (Red Bag) - Replaces Palette */
+        #inventory {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 200px;
+            height: 240px;
+            background: url('images/サンタのあかい袋.png') no-repeat center center;
+            background-size: contain;
+            pointer-events: auto;
+            z-index: 200;
+            /* filter: drop-shadow(5px 5px 15px rgba(0,0,0,0.5)); */
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-content: center;
+            padding: 40px 20px 20px 20px;
+            gap: 5px;
+        }
+
+        /* #palette-wrap removed, using #inventory */
+
+        .palette-item {
+            position: relative;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .palette-item img {
+            width: 80%;
+            height: 80%;
+            object-fit: contain;
+        }
+
+        .palette-count {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            background: #ffefbc;
+            color: #b17400;
+            border: 2px solid #d3c29e;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Game Objects */
+        .game-object {
+            position: absolute;
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+            transform-origin: center center;
+            transform-origin: center center;
+            transition: transform 0.1s;
+            background: transparent !important;
+        }
+
+        .game-object img {
+            background: transparent !important;
+        }
+
+        .game-object:active {
+            cursor: grabbing;
+        }
+
+        .game-object img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        /* Santa specific */
+        #santa {
+            z-index: 1000;
+            width: clamp(80px, 15vh, 150px);
+            height: clamp(80px, 15vh, 150px);
+            transition: left 0.1s, top 0.1s, transform 0.2s;
+            /* Smooth follow & flip */
+            pointer-events: none;
+            /* Santa shouldn't block clicks */
+        }
+
+        #santa img {
+            mix-blend-mode: multiply;
+            /* Attempt to fix white background */
+            /* Removed transition for width/height as we will animate via JS frame loop */
+        }
+
+        .santa-happy {
+            animation: bounce 0.5s infinite alternate;
+        }
+
+        @keyframes bounce {
+            from {
+                transform: translateY(0);
+            }
+
+            to {
+                transform: translateY(-20px);
+            }
+        }
+
+        /* Snow */
+        .snow {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0.8;
+            box-shadow: 0 0 10px white;
+        }
+
+        .snow.staying {
+            pointer-events: auto;
+            cursor: pointer;
+            transition: opacity 0.5s;
+        }
+
+        /* Ghost Element for Dragging */
+        .ghost {
+            position: absolute;
+            opacity: 0.7;
+            pointer-events: none;
+            z-index: 9999;
+            filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.3));
+        }
+
+        /* Start Overlay */
+        #start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* Night Overlay */
+        #night-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #000033, #191970);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+            /* Above bg (0), below game objects (10+) */
+            transition: opacity 5s ease-in-out;
+            mix-blend-mode: multiply;
+            /* Blends with the treehouse for a night effect */
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 2s infinite alternate;
+        }
+
+        @keyframes twinkle {
+            from {
+                opacity: 0.5;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Victory Overlay */
+        #victory-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 20000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            opacity: 0;
+            transition: opacity 1s ease-in;
+        }
+
+        .victory-text {
+            font-family: 'Mountains of Christmas', cursive;
+            font-size: clamp(40px, 8vw, 100px);
+            color: #ff4757;
+            text-shadow: 0 0 10px #fff, 0 0 20px #ff4757;
+            text-align: center;
+            animation: popIn 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .victory-subtext {
+            font-family: 'Segoe UI', sans-serif;
+            font-size: clamp(16px, 3vw, 30px);
+            color: white;
+            margin-top: 20px;
+            opacity: 0;
+            animation: fadeIn 1s ease-in 1s forwards;
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <img id="bg" src="images/snow-coveredtreehouse.webp" alt="Background">
+        <div id="night-overlay"></div>
+
+        <!-- Game Area for Objects -->
+        <div id="game-area" style="position: absolute; top:0; left:0; width:100%; height:85%; z-index: 10;"></div>
+
+        <!-- UI Layer -->
+        <div class="ui-layer">
+            <div class="header">サンタとエルフのプレゼント探し</div>
+
+            <div id="find-indicator">
+                <img src="images/ELF.png" style="height: 40px;">
+                <img id="target-thumb" src="" style="height: 40px; margin: 0 10px; display: none; object-fit: contain;">
+                <span id="target-text">...を探して！</span>
+            </div>
+
+            <div id="sound-controls">
+                <button class="btn" id="bgm-btn">🎵</button>
+            </div>
+        </div>
+
+        <!-- Inventory (Bag) -->
+        <div id="inventory">
+            <!-- Items generated by JS -->
+        </div>
+
+        <!-- Start Overlay -->
+        <div id="start-overlay">
+            <h1>サンタとエルフのプレゼント探し</h1>
+            <button id="start-btn">スタート！</button>
+        </div>
+
+        <!-- Victory Overlay -->
+        <div id="victory-overlay">
+            <div class="victory-text">Merry Christmas!</div>
+            <div class="victory-subtext">すべてのプレゼントをみつけたよ！</div>
+        </div>
+    </div>
+
+    <!-- Audio -->
+    <audio id="bgm" src="audio/christmas-song.mp3" loop></audio>
+    <audio id="se-bell" src="audio/bell.mp3"></audio>
+
+    <script>
+        // --- Configuration & Assets ---
+        const ASSETS = {
+            santa: {
+                // Using santa2.jpg as requested, assuming it exists or will be provided. 
+                // If not, we might need a fallback or the user will provide it.
+                // The user prompt mentioned "santa2", "reindeer2", "sleigh2".
+                img: "images/santa2.png",
+                happy: "images/SantaCheer.png"
+            },
+            reindeer: {
+                img: "images/reindeer2.png"
+            },
+            sleigh: {
+                img: "images/sleigh2.png"
+            },
+            gifts: [
+                { id: "acorn", name: "どんぐり", src: "images/どんぐり.png" },
+                { id: "chestnut", name: "木の実", src: "images/くり１.png" },
+                { id: "carrot", name: "ニンジン", src: "images/にんじん.png" },
+                { id: "muffler", name: "マフラー", src: "images/マフラー.png" },
+                { id: "toothbrush", name: "歯ブラシ", src: "images/歯ブラシ.png" },
+                { id: "crown", name: "王冠", src: "images/王冠.png" }
+            ],
+            decorations: [
+                { id: "stone", src: "images/石ころ.png", scale: 0.8 },
+                { id: "leaf", src: "images/葉っぱ.png", scale: 0.8 },
+                { id: "leaf1", src: "images/葉っぱ1.png", scale: 0.8 },
+                { id: "leaf2", src: "images/葉っぱ２.png", scale: 0.8 },
+                { id: "branch1", src: "images/小枝1.png", scale: 0.8 },
+                { id: "branch2", src: "images/小枝２.png", scale: 0.8 },
+                { id: "chestnut2", src: "images/くり２.png", scale: 0.7 },
+                { id: "chestnut3", src: "images/くり３.png", scale: 0.7 },
+                { id: "tree", src: "images/tree.png", scale: 1.5 }
+            ]
+        };
+
+        const STATE = {
+            found: {}, // { id: count }
+            currentTargetIndex: 0,
+            isPlaying: false,
+            isBgmPlaying: false,
+            dragItem: null,
+            dragOffset: { x: 0, y: 0 },
+            zIndex: 300,
+            allTargets: [],
+            zIndex: 300,
+            allTargets: [],
+            isFlyingAway: false,
+            endGameScale: 1.0
+        };
+
+        // --- Initialization ---
+        const container = document.getElementById('game-container');
+        const gameArea = document.getElementById('game-area');
+        const inventory = document.getElementById('inventory');
+
+        // Create Characters
+        const reindeer = document.createElement('div');
+        reindeer.id = 'reindeer';
+        reindeer.className = 'game-object';
+        reindeer.style.position = 'absolute';
+        reindeer.style.zIndex = 1002;
+        reindeer.style.width = '100px'; // Adjust size as needed
+        reindeer.style.height = '100px';
+        reindeer.style.pointerEvents = 'none'; // Fix D&D blocking
+        reindeer.innerHTML = `<img src="${ASSETS.reindeer.img}" draggable="false">`;
+        gameArea.appendChild(reindeer);
+
+        const sleigh = document.createElement('div');
+        sleigh.id = 'sleigh';
+        sleigh.className = 'game-object';
+        sleigh.style.position = 'absolute';
+        sleigh.style.zIndex = 1001;
+        sleigh.style.width = '120px'; // Adjust size as needed
+        sleigh.style.height = '120px';
+        sleigh.style.pointerEvents = 'none'; // Fix D&D blocking
+        sleigh.innerHTML = `<img src="${ASSETS.sleigh.img}" draggable="false">`;
+        gameArea.appendChild(sleigh);
+
+        const santa = document.createElement('div');
+        santa.id = 'santa';
+        santa.className = 'game-object';
+        santa.style.position = 'absolute';
+        santa.style.zIndex = 1003; // Higher than sleigh (1001)
+        santa.style.width = '100px'; // Adjust size as needed
+        santa.style.height = '100px';
+        santa.style.pointerEvents = 'none'; // Fix D&D blocking
+        santa.innerHTML = `<img src="${ASSETS.santa.img}" draggable="false">`;
+        gameArea.appendChild(santa);
+
+        const mcTag = document.createElement('div');
+        mcTag.id = 'merry-christmas-tag';
+        mcTag.textContent = 'Merry Christmas!';
+        gameArea.appendChild(mcTag);
+
+        // Movement State
+        let lastMousePos = { x: 0, y: 0 };
+        // Physics state for rubber band effect
+        let reindeerPos = { x: 0, y: 0, angle: 0, scale: 1 };
+        let sleighPos = { x: 0, y: 0, angle: 0, scale: 1 };
+        let santaPos = { x: 0, y: 0, angle: 0, scale: 1 };
+        let mcTagPos = { x: 0, y: 0, angle: 0, scale: 1 };
+
+        // Store dimensions for calculations to avoid layout thrashing
+        // We'll update these on resize or init
+        reindeer.width = 100;
+        reindeer.height = 100;
+
+        function initGame() {
+            // Spawn Decorations
+            const spawnedDecorations = [];
+            // Ensure 'stone' is always included if it exists in assets, or just pick randoms and track them.
+            // User said: "Questions can be random, but ensure it exists on screen!"
+            // So we must ensure that if we ask for it, it is on screen.
+            // The best way is to only add spawned items to the target list.
+
+            for (let i = 0; i < 8; i++) {
+                const d = ASSETS.decorations[Math.floor(Math.random() * ASSETS.decorations.length)];
+                spawnObject(d, true);
+                spawnedDecorations.push(d);
+            }
+
+            // Spawn Gifts
+            ASSETS.gifts.forEach(g => {
+                const count = 2 + Math.floor(Math.random() * 2);
+                for (let i = 0; i < count; i++) spawnObject(g);
+            });
+
+            // Combine gifts and ONLY SPAWNED decorations for targets
+            // Use Set to avoid duplicates in targets if multiple of same decoration spawned
+            const uniqueDecorations = [...new Set(spawnedDecorations)];
+            STATE.allTargets = [...ASSETS.gifts, ...uniqueDecorations];
+
+            updatePalette();
+            setTarget(0);
+            startSnow();
+        }
+
+        function spawnObject(item, isDecoration = false) {
+            const el = document.createElement('div');
+            el.className = 'game-object';
+            el.dataset.id = item.id;
+            el.dataset.isGift = !isDecoration;
+
+            // Random Position (10% to 90%)
+            const x = 10 + Math.random() * 80;
+            const y = 10 + Math.random() * 70;
+
+            el.style.left = x + '%';
+            el.style.top = y + '%';
+            el.style.zIndex = STATE.zIndex++;
+
+            // Random Scale
+            const baseScale = item.scale || 1.0;
+            const scale = baseScale * (0.8 + Math.random() * 0.4);
+            el.style.width = `clamp(60px, 10vh, 100px)`;
+            el.style.height = `clamp(60px, 10vh, 100px)`;
+            el.style.transform = `scale(${scale})`;
+
+            el.innerHTML = `<img src="${item.src}" draggable="false">`;
+
+            gameArea.appendChild(el);
+            makeDraggable(el);
+        }
+
+        // --- Game Logic ---
+        function setTarget(index) {
+            STATE.currentTargetIndex = index;
+
+            if (index >= STATE.allTargets.length) {
+                index = 0;
+                STATE.currentTargetIndex = 0;
+            }
+
+            const target = STATE.allTargets[index];
+            const name = target.name || target.id;
+            document.getElementById('target-text').textContent = `「${name}」を探して！`;
+
+            const thumb = document.getElementById('target-thumb');
+            thumb.src = target.src;
+            thumb.style.display = 'inline-block';
+        }
+
+        // Pass/Skip Target on Click
+        document.getElementById('target-thumb').addEventListener('click', () => {
+            if (!STATE.isPlaying) return;
+            const nextIndex = (STATE.currentTargetIndex + 1) % STATE.allTargets.length;
+            setTarget(nextIndex);
+        });
+
+        function collectItem(el, id) {
+            el.style.display = 'none';
+
+            // Play Sound
+            const se = document.getElementById('se-bell');
+            se.currentTime = 0;
+            se.play().catch(() => { });
+
+            // Santa Animation
+            const img = santa.querySelector('img');
+            const originalSrc = img.src;
+            img.src = ASSETS.santa.happy;
+            santa.classList.add('santa-happy');
+
+            setTimeout(() => {
+                img.src = originalSrc; // Revert to current santa image
+                santa.classList.remove('santa-happy');
+            }, 5000);
+
+            // Update State
+            STATE.found[id] = (STATE.found[id] || 0) + 1;
+            updatePalette();
+
+            // Next Target
+            const nextIndex = (STATE.currentTargetIndex + 1) % STATE.allTargets.length;
+            setTarget(nextIndex);
+
+            // Check Game End
+            checkGameEnd();
+        }
+
+        function checkGameEnd() {
+            // Condition: Collect >= 2 of each item in `gifts` group
+            const allGiftsFound = ASSETS.gifts.every(g => (STATE.found[g.id] || 0) >= 2);
+
+            if (allGiftsFound && !STATE.isFlyingAway) {
+                STATE.isFlyingAway = true;
+
+                // Show Merry Christmas Tag
+                mcTag.style.display = 'block';
+                // Initialize position at Santa's location
+                mcTagPos.x = santaPos.x;
+                mcTagPos.y = santaPos.y;
+            }
+        }
+
+        function updatePalette() {
+            inventory.innerHTML = '';
+            STATE.allTargets.forEach(g => {
+                if (STATE.found[g.id]) {
+                    const div = document.createElement('div');
+                    div.className = 'palette-item';
+                    div.innerHTML = `
+          <img src="${g.src}">
+          ${STATE.found[g.id] > 1 ? `<span class="palette-count">${STATE.found[g.id]}</span>` : ''}
+        `;
+                    inventory.appendChild(div);
+                }
+            });
+        }
+
+        // --- Drag & Drop (Unified Mouse/Touch) ---
+        function makeDraggable(el) {
+            let isDragging = false;
+            let startX, startY;
+            let ghost = null;
+            let longPressTimer;
+
+            el.addEventListener('mousedown', startDrag);
+
+            el.addEventListener('touchstart', (e) => {
+                if (e.touches.length !== 1) return;
+                longPressTimer = setTimeout(() => {
+                    startDrag(e);
+                }, 200);
+            }, { passive: false });
+
+            el.addEventListener('touchmove', (e) => {
+                if (longPressTimer && !isDragging) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+                if (isDragging) {
+                    e.preventDefault();
+                    drag(e);
+                }
+            }, { passive: false });
+
+            el.addEventListener('touchend', endDrag);
+            el.addEventListener('touchcancel', endDrag);
+
+            function startDrag(e) {
+                if (e.type === 'mousedown' && e.button !== 0) return;
+
+                isDragging = true;
+                el.style.zIndex = STATE.zIndex++;
+
+                const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+
+                const rect = el.getBoundingClientRect();
+
+                startX = clientX;
+                startY = clientY;
+
+                STATE.dragOffset.x = clientX - rect.left;
+                STATE.dragOffset.y = clientY - rect.top;
+
+                ghost = el.cloneNode(true);
+                ghost.classList.add('ghost');
+                ghost.style.width = rect.width + 'px';
+                ghost.style.height = rect.height + 'px';
+                ghost.style.left = rect.left + 'px';
+                ghost.style.top = rect.top + 'px';
+                ghost.style.zIndex = 99999;
+                document.body.appendChild(ghost);
+
+                el.style.opacity = '0.5';
+
+                if (e.type === 'mousedown') {
+                    document.addEventListener('mousemove', drag);
+                    document.addEventListener('mouseup', endDrag);
+                }
+            }
+
+            function drag(e) {
+                if (!isDragging) return;
+
+                const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+
+                let newX = clientX - STATE.dragOffset.x;
+                let newY = clientY - STATE.dragOffset.y;
+
+                if (ghost) {
+                    ghost.style.left = newX + 'px';
+                    ghost.style.top = newY + 'px';
+                }
+            }
+
+            function endDrag(e) {
+                if (longPressTimer) clearTimeout(longPressTimer);
+                if (!isDragging) return;
+
+                isDragging = false;
+                el.style.opacity = '1';
+
+                if (ghost) {
+                    const paletteRect = inventory.getBoundingClientRect();
+                    const ghostRect = ghost.getBoundingClientRect();
+
+                    const overlap = !(ghostRect.right < paletteRect.left ||
+                        ghostRect.left > paletteRect.right ||
+                        ghostRect.bottom < paletteRect.top ||
+                        ghostRect.top > paletteRect.bottom);
+
+                    if (overlap) {
+                        const currentTargetId = STATE.allTargets[STATE.currentTargetIndex].id;
+                        if (el.dataset.id === currentTargetId) {
+                            collectItem(el, currentTargetId);
+                            ghost.remove();
+                            ghost = null;
+                            return;
+                        }
+                    }
+
+                    if (overlap && el.dataset.id !== STATE.allTargets[STATE.currentTargetIndex].id) {
+                        // Reject
+                    } else {
+                        el.style.left = ghost.style.left;
+                        el.style.top = ghost.style.top;
+                    }
+
+                    ghost.remove();
+                    ghost = null;
+                }
+
+                if (e.type === 'mouseup') {
+                    document.removeEventListener('mousemove', drag);
+                    document.removeEventListener('mouseup', endDrag);
+                }
+            }
+        }
+
+        // --- Character Movement Logic (New) ---
+        function calculateAngle(x1, y1, x2, y2) {
+            return Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+        }
+
+        function checkPresents(reindeerX, reindeerY) {
+            // Placeholder for collision check if needed, 
+            // but we are using Drag & Drop for collection now.
+            // Keeping it empty as per request logic structure.
+        }
+
+        function moveCharacters(e) {
+            if (!STATE.isPlaying || STATE.isFlyingAway) return;
+
+            const rect = container.getBoundingClientRect();
+
+            // Handle both mouse and touch events
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.clientX !== undefined) {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            } else {
+                return;
+            }
+
+            const mouseX = clientX - rect.left;
+            const mouseY = clientY - rect.top;
+
+            lastMousePos = { x: mouseX, y: mouseY };
+        }
+
+        // Animation Loop for Smooth Physics
+        function gameLoop() {
+            if (!STATE.isPlaying) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            // --- Physics Parameters ---
+            // Spring/Lerp factors (lower = slower/more drag)
+            const reindeerLerp = 0.1;
+            const sleighLerp = 0.05;
+            const santaLerp = 0.03;
+
+            if (STATE.isFlyingAway) {
+                // Shrink over time
+                STATE.endGameScale *= 0.99;
+
+                // Transition condition
+                if (STATE.endGameScale < 0.05) {
+                    STATE.isPlaying = false;
+                    // Fade out
+                    container.style.transition = 'opacity 2s';
+                    container.style.opacity = '0';
+                    setTimeout(() => {
+                        window.location.href = 'stage2.html';
+                    }, 2000);
+                    return;
+                }
+            }
+
+            // Target positions (Mouse for Reindeer)
+            // We want Reindeer to follow mouse but with slight delay
+            reindeerPos.x += (lastMousePos.x - reindeerPos.x - reindeer.width / 2) * reindeerLerp;
+            reindeerPos.y += (lastMousePos.y - reindeerPos.y - reindeer.height / 2) * reindeerLerp;
+
+            // Calculate Angle for Reindeer
+            const rAngle = calculateAngle(reindeerPos.x, reindeerPos.y, lastMousePos.x - reindeer.width / 2, lastMousePos.y - reindeer.height / 2);
+            // Smooth angle? For now direct is okay or simple lerp
+            reindeerPos.angle = rAngle;
+
+            // Sleigh follows Reindeer
+            sleighPos.x += (reindeerPos.x - sleighPos.x) * sleighLerp;
+            sleighPos.y += (reindeerPos.y - sleighPos.y) * sleighLerp;
+
+            // Santa follows Sleigh
+            santaPos.x += (sleighPos.x - santaPos.x) * santaLerp;
+            santaPos.y += (sleighPos.y - santaPos.y) * santaLerp;
+
+            // Text follows Santa
+            if (STATE.isFlyingAway) {
+                mcTagPos.x += (santaPos.x - mcTagPos.x) * santaLerp;
+                mcTagPos.y += (santaPos.y - mcTagPos.y) * santaLerp;
+            }
+
+            // --- Visual Updates ---
+
+            // 1. Reindeer
+            // Calculate speed for scaling
+            const rDx = lastMousePos.x - (reindeerPos.x + reindeer.width / 2);
+            const rDy = lastMousePos.y - (reindeerPos.y + reindeer.height / 2);
+            const rDist = Math.sqrt(rDx * rDx + rDy * rDy);
+
+            // Scale based on speed/distance (Comical zoom)
+            const maxDist = 500;
+            const minScale = 0.5;
+            const maxScale = 1.0;
+
+            // Reindeer Scale
+            let rScale = Math.max(minScale, maxScale - (rDist / maxDist) * 0.5);
+            rScale *= STATE.endGameScale; // Apply end game shrinking
+            reindeer.style.transform = `translate(${reindeerPos.x}px, ${reindeerPos.y}px) rotate(${reindeerPos.angle}deg) scale(${rScale})`;
+
+            // 2. Sleigh
+            const sDx = reindeerPos.x - sleighPos.x;
+            const sDy = reindeerPos.y - sleighPos.y;
+            const sAngle = Math.atan2(sDy, sDx) * 180 / Math.PI;
+            const sDist = Math.sqrt(sDx * sDx + sDy * sDy);
+            let sScale = Math.max(minScale, maxScale - (sDist / maxDist) * 0.6); // Shrink more
+            sScale *= STATE.endGameScale;
+            sleigh.style.transform = `translate(${sleighPos.x}px, ${sleighPos.y}px) rotate(${sAngle}deg) scale(${sScale})`;
+
+            // 3. Santa
+            const stDx = sleighPos.x - santaPos.x;
+            const stDy = sleighPos.y - santaPos.y;
+            const stAngle = Math.atan2(stDy, stDx) * 180 / Math.PI;
+            const stDist = Math.sqrt(stDx * stDx + stDy * stDy);
+            let stScale = Math.max(minScale, maxScale - (stDist / maxDist) * 0.7); // Shrink most
+            stScale *= STATE.endGameScale;
+            // Bounce effect for Santa
+            // Santa Transform (No bounce, just follow)
+            santa.style.transform = `translate(${santaPos.x}px, ${santaPos.y}px) rotate(${stAngle}deg) scale(${stScale})`;
+
+            // 4. Text
+            if (STATE.isFlyingAway) {
+                let mcScale = rScale * 0.7; // Base it on reindeer scale for consistency
+                mcTag.style.transform = `translate(${mcTagPos.x}px, ${mcTagPos.y}px) rotate(${reindeerPos.angle}deg) scale(${mcScale})`;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start Loop
+        requestAnimationFrame(gameLoop);
+
+
+
+        // Event Listeners for Movement
+        container.addEventListener('mousemove', moveCharacters);
+        container.addEventListener('touchmove', moveCharacters);
+
+        // --- Snow System ---
+        function startSnow() {
+            setInterval(createSnow, 300);
+            setInterval(createStayingSnow, 2000);
+        }
+
+        function createSnow() {
+            const snow = document.createElement('div');
+            snow.className = 'snow';
+            snow.style.left = Math.random() * 100 + '%';
+            snow.style.top = '-10px';
+            const size = 5 + Math.random() * 10;
+            snow.style.width = size + 'px';
+            snow.style.height = size + 'px';
+
+            const duration = 5 + Math.random() * 5;
+            snow.style.transition = `top ${duration}s linear, opacity ${duration}s ease-in`;
+
+            gameArea.appendChild(snow);
+
+            // Trigger animation
+            requestAnimationFrame(() => {
+                snow.style.top = '100%';
+                snow.style.opacity = '0.2';
+            });
+
+            setTimeout(() => snow.remove(), duration * 1000);
+        }
+
+        function createStayingSnow() {
+            const snow = document.createElement('div');
+            snow.className = 'snow staying';
+            snow.style.left = Math.random() * 95 + '%';
+            snow.style.top = (Math.random() * 80 + 10) + '%'; // Don't block header
+            const size = 15 + Math.random() * 20;
+            snow.style.width = size + 'px';
+            snow.style.height = size + 'px';
+
+            // Click to remove
+            snow.onclick = () => {
+                snow.style.transform = 'scale(1.5)';
+                snow.style.opacity = '0';
+                setTimeout(() => snow.remove(), 300);
+            };
+
+            gameArea.appendChild(snow);
+
+            // Auto remove after 5-10s
+            setTimeout(() => {
+                if (snow.parentNode) {
+                    snow.style.opacity = '0';
+                    setTimeout(() => snow.remove(), 500);
+                }
+            }, 5000 + Math.random() * 5000);
+        }
+
+        // --- Audio & Start ---
+        document.getElementById('start-btn').onclick = () => {
+            document.getElementById('start-overlay').style.display = 'none';
+            STATE.isPlaying = true;
+
+            const bgm = document.getElementById('bgm');
+            bgm.volume = 0.3;
+            bgm.play().then(() => {
+                STATE.isBgmPlaying = true;
+            }).catch(e => console.log("Audio play failed", e));
+
+            initGame();
+        };
+
+        document.getElementById('bgm-btn').onclick = () => {
+            const bgm = document.getElementById('bgm');
+            if (STATE.isBgmPlaying) {
+                bgm.pause();
+                STATE.isBgmPlaying = false;
+                document.getElementById('bgm-btn').textContent = '🔇';
+            } else {
+                bgm.play();
+                STATE.isBgmPlaying = true;
+                document.getElementById('bgm-btn').textContent = '🎵';
+            }
+        };
+
+        function showVictory() {
+            const overlay = document.getElementById('victory-overlay');
+            overlay.style.display = 'flex';
+            // Trigger reflow
+            void overlay.offsetWidth;
+            overlay.style.opacity = '1';
+
+            // Start Night Transition
+            const nightOverlay = document.getElementById('night-overlay');
+
+            // Generate Stars
+            for (let i = 0; i < 50; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                const size = Math.random() * 3;
+                star.style.width = size + 'px';
+                star.style.height = size + 'px';
+                star.style.animationDelay = Math.random() * 2 + 's';
+                nightOverlay.appendChild(star);
+            }
+
+            nightOverlay.style.opacity = '1';
+        }
+
+    </script>
+</body>
+
+</html>
