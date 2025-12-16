@@ -163,7 +163,8 @@
         #inventory {
             position: absolute;
             bottom: 20px;
-            left: 20px;
+            left: -20px;
+            /* Moved left to reduce overlap */
             width: 200px;
             height: 240px;
             background: url('images/サンタのあかい袋.png') no-repeat center center;
@@ -625,9 +626,15 @@
             el.dataset.id = item.id;
             el.dataset.isGift = !isDecoration;
 
-            // Random Position (10% to 90%)
-            const x = 10 + Math.random() * 80;
-            const y = 10 + Math.random() * 70;
+            // Random Position with Safety Check
+            // Avoid bottom-left corner where the bag is (approx 0-25% X, 50-100% Y)
+            let x, y;
+            let safetyTries = 10;
+            do {
+                x = 10 + Math.random() * 80;
+                y = 10 + Math.random() * 70;
+                safetyTries--;
+            } while (x < 25 && y > 50 && safetyTries > 0);
 
             el.style.left = x + '%';
             el.style.top = y + '%';
