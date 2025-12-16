@@ -663,12 +663,87 @@
             }
 
             const target = STATE.allTargets[index];
+
+            // --- NEW: Move object to safe position ---
+            const targetEl = document.querySelector(`.game-object[data-id="${target.id}"]`);
+            if (targetEl) {
+                moveObjectToSafePosition(targetEl);
+            }
+            // -----------------------------------------
+
             const name = target.name || target.id;
             document.getElementById('target-text').textContent = `「${name}」を探して！`;
 
             const thumb = document.getElementById('target-thumb');
             thumb.src = target.src;
             thumb.style.display = 'inline-block';
+        }
+
+        // --- Safe Positioning Logic ---
+        function moveObjectToSafePosition(el) {
+            const maxRetries = 50;
+            let bestX = 0, bestY = 0;
+            let success = false;
+
+            // Dimensions for collision check (approximate percent)
+            const objW = 15; // ~10-15% width
+            const objH = 15;
+
+            for (let i = 0; i < maxRetries; i++) {
+                // Random Candidate
+                const rx = 5 + Math.random() * 80; // 5% to 85%
+                const ry = 15 + Math.random() * 65; // 15% to 80% (avoid potential footer nav if any)
+
+                // 1. Avoid ELF Indicator (Top Center)
+                // Approx: Left 40%-60%, Top 10%-25%
+                if (rx > 35 && rx < 65 && ry < 30) continue;
+
+                // 2. Avoid Inventory (Bottom Left)
+                // Approx: Left 0%-25%, Top 70%-100%
+                if (rx < 30 && ry > 65) continue;
+
+                // 3. Avoid Overlap with other visible objects
+                let overlap = false;
+                const others = document.querySelectorAll('.game-object');
+                for (const other of others) {
+                    if (other === el || other.style.display === 'none') continue;
+
+                    const ox = parseFloat(other.style.left);
+                    const oy = parseFloat(other.style.top);
+
+                    // Simple distance check in % (rough approx)
+                    const dx = rx - ox;
+                    const dy = ry - oy;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 12) { // Minimum clear distance
+                        overlap = true;
+                        break;
+                    }
+                }
+
+                if (!overlap) {
+                    bestX = rx;
+                    bestY = ry;
+                    success = true;
+                    break;
+                }
+            }
+
+            // Apply specific transformation if successful, otherwise just nudge slightly
+            if (success) {
+                el.style.transition = "all 0.5s ease-out";
+                el.style.left = bestX + '%';
+                el.style.top = bestY + '%';
+
+                // Add a visual pop effect
+                const originalScale = el.style.transform || 'scale(1)';
+                el.style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    el.style.transform = originalScale.replace('scale(1.2)', '') || 'scale(1)';
+                    // Re-randomize small variation or previous scale logic
+                }, 300);
+            }
         }
 
         // Pass/Skip Target on Click
