@@ -487,8 +487,8 @@
 
                 // Collision Check for Arata/Takeru
                 if (state === 'FINALE_INTERACT') {
-                    checkBoyInteract('arata', 'FireTruck.png');
-                    checkBoyInteract('takeru', 'Encyclopedia.png');
+                    checkBoyInteract('arata', 'LEGO.png');
+                    checkBoyInteract('takeru', 'のりものずかん.png');
                 }
             }
             createStars();
@@ -684,35 +684,60 @@
 
             const sRect = document.getElementById('santa').getBoundingClientRect();
             const bRect = boy.getBoundingClientRect();
-            if (Math.hypot(sRect.x - bRect.x, sRect.y - bRect.y) < 200) { // Larger threshold
+            if (Math.hypot(sRect.x - bRect.x, sRect.y - bRect.y) < 200) {
                 boysGiven[id] = true;
-                const gift = document.createElement('div');
-                gift.style.position = 'absolute';
-                gift.style.left = '0'; gift.style.top = '-50%';
-                gift.style.width = '100px'; // Larger gift
-                gift.innerHTML = `<img src="images/${giftImg}">`;
-                boy.appendChild(gift);
 
-                if (boysGiven.arata && boysGiven.takeru) {
-                    setTimeout(() => {
-                        const cheers = document.createElement('div');
-                        cheers.innerText = "ありがとう！サンタさん！";
-                        cheers.style.position = 'absolute';
-                        cheers.style.left = '50%'; cheers.style.top = '30%';
-                        cheers.style.transform = 'translate(-50%, 0)';
-                        cheers.style.fontFamily = 'Mountains of Christmas';
-                        cheers.style.fontSize = '40px';
-                        cheers.style.color = 'white';
-                        cheers.style.textShadow = '0 0 5px black';
-                        container.appendChild(cheers);
+                // Show Overlay for Boy
+                const overlay = document.getElementById('gift-overlay');
+                const content = document.querySelector('.overlay-content');
 
-                        setTimeout(() => {
-                            cheers.remove();
-                            state = 'FINALE';
-                        }, 2000);
-                    }, 500);
-                }
+                // Santa Faces Left in Overlay
+                document.getElementById('overlay-santa').style.transform = 'scaleX(-1)';
+                document.getElementById('overlay-gift').src = 'images/' + giftImg;
+
+                // Update overlay char image
+                const charImg = document.getElementById('overlay-miyako');
+                charImg.src = boy.querySelector('img').src;
+                charImg.style.transform = 'none';
+
+                overlay.classList.add('show');
+                content.style.transform = 'scale(1.2)';
+
+                setTimeout(() => {
+                    overlay.classList.remove('show');
+
+                    // Add gift icon to boy
+                    const gift = document.createElement('div');
+                    gift.style.position = 'absolute';
+                    gift.style.left = '0'; gift.style.top = '-50%';
+                    gift.style.width = '100px';
+                    gift.innerHTML = `<img src="images/${giftImg}">`;
+                    boy.appendChild(gift);
+
+                    // Check Finale
+                    if (boysGiven.arata && boysGiven.takeru) {
+                        setTimeout(triggerFinale, 1000);
+                    }
+                }, 3000);
             }
+        }
+
+        function triggerFinale() {
+            const cheers = document.createElement('div');
+            cheers.innerText = "ありがとう！サンタさん！";
+            cheers.style.position = 'absolute';
+            cheers.style.left = '50%'; cheers.style.top = '30%';
+            cheers.style.transform = 'translate(-50%, 0)';
+            cheers.style.fontFamily = 'Mountains of Christmas';
+            cheers.style.fontSize = '40px';
+            cheers.style.color = 'white';
+            cheers.style.textShadow = '0 0 5px black';
+            container.appendChild(cheers);
+
+            setTimeout(() => {
+                cheers.remove();
+                state = 'FINALE';
+            }, 2000);
         }
 
         function updatePos(id, pos) {
@@ -721,24 +746,78 @@
 
         function triggerGiftSequence() {
             const overlay = document.getElementById('gift-overlay');
+            const content = document.querySelector('.overlay-content');
+
+            // Setup Overlay (Santa faces Left)
+            // Note: We need to ensure overlay-santa ID exists. Default was just img src.
+            // Check HTML structure below to confirm ID. Assuming I need to add ID to overlay images.
+            // Wait, I need to check HTML structure of overlay first or simply select by index.
+            // HTML: <img src="images/santa2you.png" class="overlay-char"> <img id="overlay-gift"> <img id="overlay-miyako">
+            // So Santa is the first .overlay-char.
+            const santaImg = document.querySelector('.overlay-content img:first-child');
+            santaImg.id = 'overlay-santa'; // Assign ID for safety
+            santaImg.style.transform = 'scaleX(-1)';
+
+            document.getElementById('overlay-gift').src = 'images/presentBox1.png';
+            document.getElementById('overlay-miyako').src = 'images/Miyako.png';
+
             overlay.classList.add('show');
-            document.querySelector('.overlay-content').style.transform = 'scale(1.2)';
+            content.style.transform = 'scale(1.2)';
 
+            // Step 1: Wait 1s
             setTimeout(() => {
-                const mImg = document.querySelector('#overlay-miyako');
-                mImg.style.transition = 'transform 1s';
-                mImg.style.transform = 'rotateY(360deg)';
+                // Step 2: Box Disappears/Opens -> Dress Appears
+                const giftImg = document.getElementById('overlay-gift');
+                // visual change
+                giftImg.src = 'images/ELSADress.png';
+                giftImg.style.transition = 'transform 1s, opacity 0.5s';
+                giftImg.style.transform = 'translateY(-50px) scale(1.5)';
+
+                // Step 3: Miyako Lifts logic (implied by dress moving up)
                 setTimeout(() => {
-                    mImg.src = 'images/MiyakoElsa.png';
-                    miyako.querySelector('img').src = 'images/MiyakoElsa.png';
-                }, 500);
-            }, 2000);
+                    const mImg = document.getElementById('overlay-miyako');
+                    mImg.style.transition = 'transform 1s';
+                    mImg.style.transform = 'rotateY(360deg)';
 
-            setTimeout(() => {
-                overlay.classList.remove('show');
-                state = 'FINALE_PREP';
-                startFinale();
-            }, 5000);
+                    setTimeout(() => {
+                        mImg.src = 'images/MiyakoElsa.png';
+                        // Update game object real Miyako
+                        const realMiyakoImg = miyako.querySelector('img');
+                        realMiyakoImg.src = 'images/MiyakoElsa.png';
+
+                        setTimeout(() => {
+                            overlay.classList.remove('show');
+
+                            // START SPIN on Main Character
+                            startMiyakoSpin();
+
+                            state = 'FINALE_PREP';
+                            startFinalePrep();
+                        }, 2000);
+                    }, 500);
+                }, 1500);
+            }, 1000);
+        }
+
+        function startMiyakoSpin() {
+            // Replace IMG with Div for Sprite Anim to animate `miyako_4dirDress.png`
+            // Assuming the sprite sheet is 4 frames horizontal.
+            miyako.innerHTML = '<div id="miyako-sprite" style="width:100%; height:100%; background: url(images/miyako_4dirDress.png) no-repeat; background-size: 400% 100%;"></div>';
+
+            let frame = 0;
+            // Spin loop (4 frames)
+            setInterval(() => {
+                frame = (frame + 1) % 4;
+                // 140px width * 4 = 560px
+                const offset = frame * -140;
+                document.getElementById('miyako-sprite').style.backgroundPosition = `${offset}px 0`;
+            }, 200);
+        }
+
+        function startFinalePrep() {
+            createChar('arata', 'images/Arata.png', 30, 80);
+            createChar('takeru', 'images/Takeru.png', 60, 80);
+            state = 'FINALE_INTERACT';
         }
 
         function startFinale() {
