@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>サンタとエルフ - Stage 3</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #87CEEB;
+            touch-action: none;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #bg {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+        }
+
+        .game-object {
+            position: absolute;
+            transform-origin: center bottom;
+            pointer-events: none;
+            transition: all 0.5s;
+            z-index: 10;
+        }
+
+        .game-object img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* Santa Chain - Resized 2x */
+        .santa-group {
+            position: absolute;
+            z-index: 100;
+            pointer-events: none;
+            transform-origin: center center;
+        }
+
+        .santa-group img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* Dialog UI */
+        #dialog-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 80%;
+            max-width: 600px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            padding: 20px;
+            z-index: 5000;
+            transition: transform 0.3s;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+
+        #dialog-modal.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .dialog-text {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 10px;
+            min-height: 60px;
+        }
+
+        /* Voice UI */
+        #mic-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: #e74c3c;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.1s, background 0.3s;
+        }
+
+        #mic-btn:active {
+            transform: scale(0.95);
+        }
+
+        #mic-btn.listening {
+            background: #2ecc71;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7);
+            }
+
+            70% {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 20px rgba(46, 204, 113, 0);
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(46, 204, 113, 0);
+            }
+        }
+
+        /* API Key Modal */
+        #api-key-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+        }
+
+        #api-key-input {
+            padding: 10px;
+            font-size: 1.2rem;
+            width: 300px;
+            margin: 20px;
+            font-family: monospace;
+        }
+
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            background: #95a5a6;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        /* Gift Overlay */
+        #gift-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 6000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #gift-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .overlay-content {
+            display: flex;
+            align-items: center;
+            gap: 50px;
+            transform: scale(0.8);
+            transition: transform 0.5s;
+        }
+
+        .overlay-char {
+            height: 400px;
+            object-fit: contain;
+        }
+
+        /* Larger */
+        .sparkle {
+            animation: spin 3s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes sway {
+            0% {
+                transform: rotate(-10deg);
+            }
+
+            100% {
+                transform: rotate(10deg);
+            }
+        }
+
+        /* Finale Text */
+        #end-msg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-family: 'Mountains of Christmas', cursive;
+            font-size: 5rem;
+            background: linear-gradient(to right, #ff0000, #00ff00);
+            -webkit-background-clip: text;
+            color: transparent;
+            z-index: 7000;
+            transition: transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game-container">
+        <img id="bg" src="images/snow-coveredtreehouse.webp" alt="Background">
+
+        <!-- Interactive Layers -->
+        <div id="game-area"></div>
+
+        <!-- Characters (Dynamic) -->
+        <!-- Resized 2x: width ~70px -> ~140px -->
+        <div id="miyako" class="game-object" style="width: 140px; height: 180px; display: none;">
+            <img src="images/Miyako.png">
+        </div>
+
+        <!-- Santa Group Resized 2x -->
+        <div id="reindeer" class="santa-group" style="width: 200px; height: 200px;"><img src="images/reindeer2.png">
+        </div>
+        <div id="sleigh" class="santa-group" style="width: 240px; height: 240px;"><img src="images/sleigh2.png"></div>
+        <div id="santa" class="santa-group" style="width: 200px; height: 200px;"><img src="images/santa2.png"></div>
+
+        <!-- API Key Modal -->
+        <div id="api-key-modal">
+            <h2>Gemini API Key Setup</h2>
+            <p>Please enter your Gemini API Key to talk with Santa.</p>
+            <!-- Changed to TEXT for debug visibility -->
+            <input type="text" id="api-key-input" placeholder="AIzaSy...">
+            <button class="btn"
+                style="font-size: 1.2rem; padding: 10px 20px; background: #2ecc71; color: white; border: none; border-radius: 5px; cursor: pointer;"
+                onclick="saveApiKey()">Start Game</button>
+            <button class="btn-small" onclick="resetKey()">Reset Key</button>
+        </div>
+
+        <!-- Dialogue Modal -->
+        <div id="dialog-modal">
+            <h2 style="color: #c0392b;">🎅 サンタ</h2>
+            <div id="santa-text" class="dialog-text">あ、MIYAKOちゃん！ごめんごめん！プレゼント渡すのわすれてたよ！何が、欲しかったっけ？</div>
+            <button id="mic-btn" onclick="toggleMic()">🎤</button>
+            <p id="mic-hint" style="font-size: 0.8rem; color: #666;">ボタンを押して、マイクを許可して話してね（話し終わったらもう一度押す）</p>
+        </div>
+
+        <!-- Gift Overlay -->
+        <div id="gift-overlay">
+            <div class="overlay-content">
+                <img src="images/santa2you.png" class="overlay-char">
+                <img id="overlay-gift" src="images/presentBox1.png" style="width: 200px;">
+                <img id="overlay-miyako" src="images/Miyako.png" class="overlay-char">
+            </div>
+        </div>
+
+        <div id="end-msg">Merry Christmas!</div>
+    </div>
+
+    <audio id="bgm" src="audio/christmas-song.mp3" loop></audio>
+
+    <script>
+        const container = document.getElementById('game-container');
+        const miyako = document.getElementById('miyako');
+        const dialogModal = document.getElementById('dialog-modal');
+        const santaText = document.getElementById('santa-text');
+        const micBtn = document.getElementById('mic-btn');
+        const micHint = document.getElementById('mic-hint');
+        const bgm = document.getElementById('bgm');
+        const apiKeyModal = document.getElementById('api-key-modal');
+        const apiKeyInput = document.getElementById('api-key-input');
+
+        // State
+        let state = 'INIT';
+        let mouse = { x: 0, y: 0 };
+        let finaleStartTime = 0;
+        let apiKey = localStorage.getItem('gemini_api_key');
+
+        // Santa Physics
+        let reindeerPos = { x: -300, y: 100 };
+        let sleighPos = { x: -400, y: 100 };
+        let santaPos = { x: -500, y: 100 };
+
+        // Animals (Background) - Resized 2x (approx 120px)
+        const animals = [
+            { id: 'sq', img: 'images/リスばんざい.png', x: 20, y: 70, gift: 'images/どんぐり.png' },
+            { id: 'rb', img: 'images/ウサギばんざい.png', x: 40, y: 75, gift: 'images/にんじん.png' },
+            { id: 'gr', img: 'images/キリン横.png', x: 70, y: 60, gift: 'images/マフラー.png' },
+            { id: 'ln', img: 'images/LionSmile.png', x: 85, y: 70, gift: 'images/王冠.png' },
+            { id: 'cr', img: 'images/ワニ笑い.png', x: 10, y: 80, gift: 'images/歯ブラシ.png' }
+        ];
+
+        // --- Init & API Key ---
+        if (apiKey) {
+            console.log('Key found in localStorage');
+            apiKeyInput.value = apiKey;
+            document.querySelector('#api-key-modal h2').innerText = "Ready?";
+            document.querySelector('#api-key-modal p').innerText = "Click Start to enable audio";
+        } else {
+            console.log('No key found');
+        }
+
+        function saveApiKey() {
+            let key = apiKeyInput.value.trim();
+            console.log("Input value:", key, "Local variable:", apiKey);
+
+            // Fallback: if value is empty/masked but state has key
+            if (!key && apiKey) key = apiKey;
+
+            if (key) {
+                apiKey = key;
+                try {
+                    localStorage.setItem('gemini_api_key', key);
+                } catch (e) { console.error("LocalStorage error", e); }
+
+                apiKeyModal.style.display = 'none';
+
+                // Unlock Audio
+                if (bgm.paused) {
+                    bgm.play()
+                        .then(() => console.log('BGM playing'))
+                        .catch(e => console.log('BGM Error', e));
+                }
+                window.speechSynthesis.cancel(); // Warm up
+
+                initGame();
+            } else {
+                alert("API Keyが空です。入力してください。");
+            }
+        }
+
+        function resetKey() {
+            localStorage.removeItem('gemini_api_key');
+            apiKey = null;
+            apiKeyInput.value = '';
+            alert("API Keyをリセットしました。リロードしてください。");
+            location.reload();
+        }
+
+        function initGame() {
+            console.log("Game Initialized");
+            // Spawn Animals (Larger)
+            animals.forEach(a => {
+                const el = document.createElement('div');
+                el.className = 'game-object';
+                el.style.left = a.x + '%';
+                el.style.top = a.y + '%';
+                el.style.width = '120px'; // 2x
+                el.style.height = '120px';
+                el.innerHTML = `<img src="${a.img}"><div style="position:absolute; top:-30%; left:20%; width:60px;"><img src="${a.gift}"></div>`;
+                el.style.animation = `sway ${2 + Math.random()}s infinite alternate ease-in-out`;
+                document.getElementById('game-area').appendChild(el);
+            });
+
+            // Start Sequence
+            setTimeout(miyakoEnter, 1000);
+            requestAnimationFrame(loop);
+        }
+
+        document.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        function miyakoEnter() {
+            miyako.style.display = 'block';
+            miyako.style.left = '50%';
+            miyako.style.top = '40%';
+            let top = 40;
+            const climb = setInterval(() => {
+                top += 0.5;
+                miyako.style.top = top + '%';
+                if (top >= 65) {
+                    clearInterval(climb);
+                    state = 'MIYAKO_ACTIVE';
+                    setTimeout(() => { state = 'SANTA_ENTER'; }, 1000);
+                }
+            }, 20);
+        }
+
+        function loop(timestamp) {
+            // MIYAKO Logic
+            if (state === 'MIYAKO_ACTIVE' || state === 'SANTA_ENTER') {
+                const mx = mouse.x;
+                const my = Math.min(mouse.y, window.innerHeight * 0.85);
+                const rect = miyako.getBoundingClientRect();
+                const curX = rect.left + rect.width / 2;
+                const curY = rect.top + rect.height;
+                miyako.style.left = (rect.left + (mx - curX) * 0.05) + 'px';
+                miyako.style.top = (rect.top + (my - curY) * 0.05) + 'px';
+            }
+
+            // Santa Logic
+            let targetX, targetY;
+            if (state === 'SANTA_ENTER' || state === 'FINALE_INTERACT') {
+                targetX = mouse.x;
+                targetY = mouse.y - 200; // Increased offset for bigger santa
+            } else if (state === 'FINALE') {
+                if (!finaleStartTime) finaleStartTime = timestamp;
+                const elapsed = timestamp - finaleStartTime;
+                const centerX = window.innerWidth / 2;
+                const centerY = window.innerHeight / 2;
+                const radius = 300;
+                if (elapsed < 5000) {
+                    const angle = (elapsed / 5000) * Math.PI * 4;
+                    targetX = centerX + Math.cos(angle) * radius;
+                    targetY = centerY + Math.sin(angle) * radius;
+                } else {
+                    targetX = window.innerWidth * 2;
+                    targetY = -500;
+                    document.getElementById('end-msg').style.transform = 'translate(-50%, -50%) scale(1)';
+                }
+            } else {
+                targetX = santaPos.x;
+                targetY = santaPos.y;
+            }
+
+            if (state === 'SANTA_ENTER' || state === 'FINALE' || state === 'FINALE_INTERACT') {
+                const smoothing = 0.05;
+                reindeerPos.x += (targetX - reindeerPos.x) * smoothing;
+                reindeerPos.y += (targetY - reindeerPos.y) * smoothing;
+                sleighPos.x += (reindeerPos.x - sleighPos.x - 120) * smoothing; // Offset adjust
+                sleighPos.y += (reindeerPos.y - sleighPos.y) * smoothing;
+                santaPos.x += (sleighPos.x - santaPos.x - 100) * smoothing;
+                santaPos.y += (sleighPos.y - santaPos.y) * smoothing;
+
+                updatePos('reindeer', reindeerPos);
+                updatePos('sleigh', sleighPos);
+                updatePos('santa', santaPos);
+
+                // Collision Check (Santa touches Miyako) - Adjusted for size (2x -> 200px threshold)
+                if (state === 'SANTA_ENTER') {
+                    const sRect = document.getElementById('santa').getBoundingClientRect();
+                    const mRect = miyako.getBoundingClientRect();
+                    const dist = Math.hypot(sRect.x - mRect.x, sRect.y - mRect.y);
+                    if (dist < 200) {
+                        state = 'DIALOG';
+                        dialogModal.classList.add('show');
+                        speak(santaText.innerText); // Initial speak
+                    }
+                }
+
+                // Collision Check for Arata/Takeru
+                if (state === 'FINALE_INTERACT') {
+                    checkBoyInteract('arata', 'FireTruck.png');
+                    checkBoyInteract('takeru', 'Encyclopedia.png');
+                }
+            }
+            createStars();
+            requestAnimationFrame(loop);
+        }
+
+        // --- Voice & AI Logic ---
+        let recognition;
+        let isListening = false;
+
+        try {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.classList.add('listening');
+                micHint.innerText = "聞いています... (もう一度押すと送信)";
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                micBtn.classList.remove('listening');
+                micHint.innerText = "ボタンを押して話してね";
+            };
+
+            recognition.onresult = async (event) => {
+                if (event.results[0].isFinal) {
+                    const transcript = event.results[0][0].transcript;
+                    isListening = false;
+                    micBtn.classList.remove('listening');
+                    handleVoiceInput(transcript);
+                }
+            };
+
+            recognition.onerror = (e) => {
+                console.error(e);
+                if (e.error === 'no-speech') {
+                    // Just ignore or reset UI
+                }
+            };
+        } catch (e) {
+            console.error('Speech API not supported');
+        }
+
+        function toggleMic() {
+            if (!recognition) return alert("ブラウザが音声認識に対応していません");
+
+            if (isListening) {
+                // Stop manually
+                recognition.stop();
+            } else {
+                // Start
+                try {
+                    recognition.start();
+                } catch (e) { console.error(e); }
+            }
+        }
+
+        async function handleVoiceInput(transcript) {
+            console.log('Final:', transcript);
+            // Call Gemini API
+            const response = await callGemini(transcript);
+            santaText.innerText = response.text;
+            speak(response.text);
+
+            if (response.success) {
+                setTimeout(() => {
+                    dialogModal.classList.remove('show');
+                    triggerGiftSequence();
+                }, 3000);
+            }
+        }
+
+        function speak(text) {
+            window.speechSynthesis.cancel();
+            const ut = new SpeechSynthesisUtterance(text);
+            ut.lang = 'ja-JP';
+            ut.pitch = 0.6; // Deep voice
+            ut.rate = 0.8;  // Slow, calm pace
+
+            // Try to select a Japanese voice (Google or Microsoft)
+            const voices = window.speechSynthesis.getVoices();
+            const jpVoice = voices.find(v => v.lang.includes('ja') && (v.name.includes('Google') || v.name.includes('Ichiro')));
+            if (jpVoice) ut.voice = jpVoice;
+
+            window.speechSynthesis.speak(ut);
+        }
+
+        async function callGemini(userText) {
+            const prompt = `
+            You are Santa Claus talking to a 6-year old Japanese girl named Miyako.
+            Your goal is to give her a present, but you forgot what she wanted.
+            You must guide her to say she wants "Elsa's Dress" (from Frozen).
+            
+            Speak in a warm, gentle, and natural grandfatherly tone (Japanese).
+            Avoid being robotic. It's okay to be a little chatty (up to 2 sentences).
+            
+            If she says something vague, ask gently: "Is it blue?" or "Is it for a princess?".
+            If she implies Elsa/Frozen, say delightfully: "Oh ho ho! Elsa's Dress! I have it right here!"
+            
+            Return JSON: { "text": "YOUR_RESPONSE", "success": boolean }
+            User said: "${userText}"
+            `;
+
+            // Switch to Gemini 2.0 Flash as requested
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+                const data = await res.json();
+
+                // Added Error Handling
+                if (data.error) {
+                    throw new Error(data.error.message || "API Error");
+                }
+
+                if (!data.candidates || !data.candidates[0]) {
+                    throw new Error("No candidates returned");
+                }
+
+                const rawText = data.candidates[0].content.parts[0].text;
+
+                // Cleanup JSON if needed (Gemini might wrap in ```json)
+                const jsonStr = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                return JSON.parse(jsonStr);
+
+            } catch (e) {
+                console.error("API Failed, using Rule-Based Fallback", e);
+
+                // Rule-Based Logic (Fallback)
+                const lower = userText.toLowerCase();
+                // Check against Japanese and English keywords
+                if (lower.includes('エルサ') || lower.includes('ドレス') || lower.includes('アナ雪') || lower.includes('プリンセス') || lower.includes('dress') || lower.includes('elsa') || lower.includes('frozen')) {
+                    return { text: "おお！エルサのドレスだね！もちろん持っているよ！", success: true };
+                } else {
+                    const fallbackResponses = [
+                        "ん？よく聞こえなかったな。青い色のものかな？",
+                        "プリンセスが着るものかな？",
+                        "キラキラしているものかい？",
+                        "「エルサ」が好きだったかな？"
+                    ];
+                    return { text: fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)], success: false };
+                }
+            }
+        }
+
+        // --- Boy Interaction ---
+        let boysGiven = { arata: false, takeru: false };
+
+        function checkBoyInteract(id, giftImg) {
+            const boy = document.getElementById(id);
+            if (!boy || boysGiven[id]) return;
+
+            const sRect = document.getElementById('santa').getBoundingClientRect();
+            const bRect = boy.getBoundingClientRect();
+            if (Math.hypot(sRect.x - bRect.x, sRect.y - bRect.y) < 200) { // Larger threshold
+                boysGiven[id] = true;
+                const gift = document.createElement('div');
+                gift.style.position = 'absolute';
+                gift.style.left = '0'; gift.style.top = '-50%';
+                gift.style.width = '100px'; // Larger gift
+                gift.innerHTML = `<img src="images/${giftImg}">`;
+                boy.appendChild(gift);
+
+                if (boysGiven.arata && boysGiven.takeru) {
+                    setTimeout(() => {
+                        const cheers = document.createElement('div');
+                        cheers.innerText = "ありがとう！サンタさん！";
+                        cheers.style.position = 'absolute';
+                        cheers.style.left = '50%'; cheers.style.top = '30%';
+                        cheers.style.transform = 'translate(-50%, 0)';
+                        cheers.style.fontFamily = 'Mountains of Christmas';
+                        cheers.style.fontSize = '40px';
+                        cheers.style.color = 'white';
+                        cheers.style.textShadow = '0 0 5px black';
+                        container.appendChild(cheers);
+
+                        setTimeout(() => {
+                            cheers.remove();
+                            state = 'FINALE';
+                        }, 2000);
+                    }, 500);
+                }
+            }
+        }
+
+        function updatePos(id, pos) {
+            document.getElementById(id).style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+        }
+
+        function triggerGiftSequence() {
+            const overlay = document.getElementById('gift-overlay');
+            overlay.classList.add('show');
+            document.querySelector('.overlay-content').style.transform = 'scale(1.2)';
+
+            setTimeout(() => {
+                const mImg = document.querySelector('#overlay-miyako');
+                mImg.style.transition = 'transform 1s';
+                mImg.style.transform = 'rotateY(360deg)';
+                setTimeout(() => {
+                    mImg.src = 'images/MiyakoElsa.png';
+                    miyako.querySelector('img').src = 'images/MiyakoElsa.png';
+                }, 500);
+            }, 2000);
+
+            setTimeout(() => {
+                overlay.classList.remove('show');
+                state = 'FINALE_PREP';
+                startFinale();
+            }, 5000);
+        }
+
+        function startFinale() {
+            createChar('arata', 'images/Arata.png', 30, 80);
+            createChar('takeru', 'images/Takeru.png', 60, 80);
+            state = 'FINALE_INTERACT';
+        }
+
+        function createChar(id, src, x, y) {
+            const el = document.createElement('div');
+            el.id = id;
+            el.className = 'game-object';
+            el.style.left = x + '%';
+            el.style.top = y + '%';
+            el.style.width = '140px'; // Larger
+            el.style.height = '180px';
+            el.innerHTML = `<img src="${src}">`;
+            document.getElementById('game-area').appendChild(el);
+            return el;
+        }
+
+        function createStars() {
+            if (Math.random() > 0.1) return;
+            const star = document.createElement('div');
+            star.className = 'sparkle';
+            star.style.position = 'absolute';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.top = Math.random() * 100 + '%';
+            star.style.width = (2 + Math.random() * 3) + 'px';
+            star.style.height = star.style.width;
+            star.style.background = 'white';
+            star.style.borderRadius = '50%';
+            star.style.pointerEvents = 'none';
+            document.getElementById('game-container').appendChild(star);
+            setTimeout(() => star.remove(), 1000);
+        }
+    </script>
+</body>
+
+</html>
