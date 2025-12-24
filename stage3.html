@@ -553,8 +553,18 @@
 
         async function handleVoiceInput(transcript) {
             console.log('Final:', transcript);
+
+            // Push user text to history
+            chatHistory.push({ role: 'user', text: transcript });
+            if (chatHistory.length > 10) chatHistory.shift();
+
             // Call Gemini API
             const response = await callGemini(transcript);
+
+            // Push Santa response to history
+            chatHistory.push({ role: 'santa', text: response.text });
+            if (chatHistory.length > 10) chatHistory.shift();
+
             santaText.innerText = response.text;
             speak(response.text);
 
@@ -581,20 +591,32 @@
             window.speechSynthesis.speak(ut);
         }
 
+        // Chat History for Context
+        let chatHistory = [];
+
         async function callGemini(userText) {
+            // Build Context string
+            const historyStr = chatHistory.slice(-4).map(h => `${h.role}: ${h.text}`).join('\\n');
+
             const prompt = `
             You are Santa Claus talking to a 6-year old Japanese girl named Miyako.
             Your goal is to give her a present, but you forgot what she wanted.
             You must guide her to say she wants "Elsa's Dress" (from Frozen).
             
+            
+            Current Conversation:
+            ${historyStr}
+            User: ${userText}
+            
             Speak in a warm, gentle, and natural grandfatherly tone (Japanese).
             Avoid being robotic. It's okay to be a little chatty (up to 2 sentences).
             
-            If she says something vague, ask gently: "Is it blue?" or "Is it for a princess?".
-            If she implies Elsa/Frozen, say delightfully: "Oh ho ho! Elsa's Dress! I have it right here!"
+            Important Logic:
+            - If she says "Yes", "Un", "Hai" to your question about Elsa/Princess/Dress, ACT AS IF SHE CONFIRMED IT. Say: "Oh ho ho! Elsa's Dress! I have it right here!"
+            - If she says something vague, ask gently: "Is it blue?" or "Is it for a princess?".
+            - If she explicitly asks for Elsa/Frozen/Dress, celebrate immediately.
             
             Return JSON: { "text": "YOUR_RESPONSE", "success": boolean }
-            User said: "${userText}"
             `;
 
             // Switch to Gemini 2.0 Flash as requested
@@ -610,7 +632,6 @@
                 });
                 const data = await res.json();
 
-                // Added Error Handling
                 if (data.error) {
                     throw new Error(data.error.message || "API Error");
                 }
@@ -628,12 +649,21 @@
             } catch (e) {
                 console.error("API Failed, using Rule-Based Fallback", e);
 
-                // Rule-Based Logic (Fallback)
+                // Rule-Based Logic (Fallback) WITH CONTEXT
                 const lower = userText.toLowerCase();
-                // Check against Japanese and English keywords
+                const lastSantaMsg = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].text : "";
+
+                // Check if last question was about the target
+                const wasAskedAboutTarget = lastSantaMsg.includes('エルサ') || lastSantaMsg.includes('プリンセス') || lastSantaMsg.includes('ドレス');
+
                 if (lower.includes('エルサ') || lower.includes('ドレス') || lower.includes('アナ雪') || lower.includes('プリンセス') || lower.includes('dress') || lower.includes('elsa') || lower.includes('frozen')) {
                     return { text: "おお！エルサのドレスだね！もちろん持っているよ！", success: true };
-                } else {
+                }
+                // Context Aware Yes
+                else if ((lower.includes('はい') || lower.includes('うん') || lower.includes('yes')) && wasAskedAboutTarget) {
+                    return { text: "おお！エルサのドレスだね！もちろん持っているよ！", success: true };
+                }
+                else {
                     const fallbackResponses = [
                         "ん？よく聞こえなかったな。青い色のものかな？",
                         "プリンセスが着るものかな？",
