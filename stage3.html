@@ -366,7 +366,12 @@
                         .then(() => console.log('BGM playing'))
                         .catch(e => console.log('BGM Error', e));
                 }
-                window.speechSynthesis.cancel(); // Warm up
+
+                // iOS TTS Warmup
+                window.speechSynthesis.cancel();
+                const warmUp = new SpeechSynthesisUtterance('');
+                warmUp.volume = 0;
+                window.speechSynthesis.speak(warmUp);
 
                 initGame();
             } else {
@@ -565,6 +570,11 @@
                 if (bgm.paused) bgm.play().catch(e => console.log(e));
                 window.speechSynthesis.cancel();
 
+                // iOS Audio Warmup (Silent)
+                const warmUp = new SpeechSynthesisUtterance('');
+                warmUp.volume = 0;
+                window.speechSynthesis.speak(warmUp);
+
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SpeechRecognition) {
                     if (!recognition) {
@@ -580,8 +590,10 @@
                         };
                     }
                     recognition.start();
+                    showModeIndicator("Standard Mode");
                 } else {
                     // Fallback: MediaRecorder
+                    showModeIndicator("iOS Mode (Direct)"); // Show indicator
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     let mimeType = 'audio/webm';
                     if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
@@ -614,6 +626,24 @@
                 console.error(e);
                 alert("マイクエラー: " + e.message);
             }
+        }
+
+        // Unobtrusive Mode Indicator
+        function showModeIndicator(text) {
+            let el = document.getElementById('mode-indicator');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'mode-indicator';
+                el.style.position = 'absolute';
+                el.style.bottom = '5px';
+                el.style.right = '5px';
+                el.style.fontSize = '10px';
+                el.style.color = 'rgba(255,255,255,0.3)'; // Very subtle
+                el.style.pointerEvents = 'none';
+                el.style.fontFamily = 'sans-serif';
+                document.body.appendChild(el);
+            }
+            el.innerText = text;
         }
 
         function blobToBase64(blob) {
