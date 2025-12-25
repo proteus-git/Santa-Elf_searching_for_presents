@@ -288,6 +288,10 @@
             <div id="santa-text" class="dialog-text">あ、MIYAKOちゃん！ごめんごめん！プレゼント渡すのわすれてたよ！何が、欲しかったっけ？</div>
             <button id="mic-btn" onclick="toggleMic()">🎤</button>
             <p id="mic-hint" style="font-size: 0.8rem; color: #666;">ボタンを押して、マイクを許可して話してね（話し終わったらもう一度押す）</p>
+            <!-- Debug Display -->
+            <div id="debug-display"
+                style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 5px; font-size: 0.7rem; font-family: monospace; color: #333; max-height: 100px; overflow-y: auto;">
+            </div>
         </div>
 
         <!-- Gift Overlay -->
@@ -504,6 +508,16 @@
         let recognition;
         let isListening = false;
 
+        // Debug Helper
+        function debugLog(msg) {
+            console.log('[DEBUG]', msg);
+            const el = document.getElementById('debug-display');
+            if (el) {
+                el.innerHTML += msg + '<br>';
+                el.scrollTop = el.scrollHeight;
+            }
+        }
+
 
 
         try {
@@ -567,6 +581,7 @@
 
             // Start
             try {
+                debugLog('toggleMic: Starting...');
                 if (bgm.paused) bgm.play().catch(e => console.log(e));
                 window.speechSynthesis.cancel();
 
@@ -576,6 +591,7 @@
                 window.speechSynthesis.speak(warmUp);
 
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                debugLog('SpeechRecognition check: ' + (SpeechRecognition ? 'Available' : 'NOT Available'));
                 if (SpeechRecognition) {
                     if (!recognition) {
                         // Re-init if needed
@@ -591,10 +607,13 @@
                     }
                     recognition.start();
                     showModeIndicator("Standard Mode");
+                    debugLog('Mode: Standard (STT)');
                 } else {
                     // Fallback: MediaRecorder
+                    debugLog('Mode: iOS Direct Audio (MediaRecorder)');
                     showModeIndicator("iOS Mode (Direct)"); // Show indicator
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    debugLog('Mic stream acquired');
                     let mimeType = 'audio/webm';
                     if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
 
@@ -621,6 +640,7 @@
                     isListening = true;
                     micBtn.classList.add('listening');
                     micHint.innerText = "録音中... (もう一度押すと送信)";
+                    debugLog('Recording started...');
                 }
             } catch (e) {
                 console.error(e);
@@ -703,6 +723,7 @@
 
         async function handleVoiceInput(transcript, audioBase64 = null, mimeType = null) {
             console.log('Input:', transcript ? transcript : '[Audio Data]');
+            debugLog('handleVoiceInput called - Text: ' + (transcript || 'NONE') + ', Audio: ' + (audioBase64 ? (audioBase64.length + ' bytes') : 'NONE'));
 
             // Push user text to history ONLY if transcript exists
             if (transcript) {
@@ -711,7 +732,9 @@
             }
 
             // Call Gemini API
+            debugLog('Calling Gemini API...');
             const response = await callGemini(transcript, audioBase64, mimeType);
+            debugLog('Gemini response: ' + JSON.stringify(response));
 
             // Push Santa response to history
             chatHistory.push({ role: 'model', text: response.text }); // 'model' is correct for Gemini
