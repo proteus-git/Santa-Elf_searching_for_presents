@@ -499,8 +499,14 @@
         let recognition;
         let isListening = false;
 
+
+
         try {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            // Explicitly verify support (iOS returns undefined mostly)
+            if (!SpeechRecognition) throw new Error("Speech Recognition Not Supported");
+
             recognition = new SpeechRecognition();
             recognition.lang = 'ja-JP';
             recognition.continuous = false;
@@ -534,21 +540,92 @@
                 }
             };
         } catch (e) {
-            console.error('Speech API not supported');
+            console.warn('Speech API not supported (iOS/Safari etc). Switching to Text Mode.');
+            // Switch UI to Text Mode
+            micBtn.style.display = 'none';
+            micHint.innerText = "マイクが使えないため、文字で入力してね↓";
+            textInputContainer.style.display = 'block';
         }
 
-        function toggleMic() {
-            if (!recognition) return alert("ブラウザが音声認識に対応していません");
+        let mediaRecorder;
+        let audioChunks = [];
+
+        async function toggleMic() {
+            if (!apiKey) return alert("API Keyを入力してください");
 
             if (isListening) {
-                // Stop manually
-                recognition.stop();
-            } else {
-                // Start
-                try {
-                    recognition.start();
-                } catch (e) { console.error(e); }
+                // Stop
+                if (recognition) recognition.stop();
+                if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+                return;
             }
+
+            // Start
+            try {
+                if (bgm.paused) bgm.play().catch(e => console.log(e));
+                window.speechSynthesis.cancel();
+
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (SpeechRecognition) {
+                    if (!recognition) {
+                        // Re-init if needed
+                        recognition = new SpeechRecognition();
+                        recognition.lang = 'ja-JP';
+                        recognition.continuous = false;
+                        recognition.interimResults = true;
+                        recognition.onstart = () => { isListening = true; micBtn.classList.add('listening'); micHint.innerText = "聞いています..."; };
+                        recognition.onend = () => { isListening = false; micBtn.classList.remove('listening'); micHint.innerText = "ボタンを押して話してね"; };
+                        recognition.onresult = (e) => {
+                            if (e.results[0].isFinal) handleVoiceInput(e.results[0][0].transcript);
+                        };
+                    }
+                    recognition.start();
+                } else {
+                    // Fallback: MediaRecorder
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    let mimeType = 'audio/webm';
+                    if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+
+                    mediaRecorder = new MediaRecorder(stream, { mimeType });
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) audioChunks.push(e.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        isListening = false;
+                        micBtn.classList.remove('listening');
+                        micHint.innerText = "ボタンを押して話してね";
+
+                        const audioBlob = new Blob(audioChunks, { type: mimeType });
+                        const base64Audio = await blobToBase64(audioBlob);
+                        handleVoiceInput(null, base64Audio, mimeType);
+
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    isListening = true;
+                    micBtn.classList.add('listening');
+                    micHint.innerText = "録音中... (もう一度押すと送信)";
+                }
+            } catch (e) {
+                console.error(e);
+                alert("マイクエラー: " + e.message);
+            }
+        }
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64String = reader.result.split(',')[1];
+                    resolve(base64String);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
         }
 
         async function handleVoiceInput(transcript) {
@@ -594,30 +671,68 @@
         // Chat History for Context
         let chatHistory = [];
 
-        async function callGemini(userText) {
+        async function handleVoiceInput(transcript, audioBase64 = null, mimeType = null) {
+            console.log('Input:', transcript ? transcript : '[Audio Data]');
+
+            // Push user text to history ONLY if transcript exists
+            if (transcript) {
+                chatHistory.push({ role: 'user', text: transcript });
+                if (chatHistory.length > 10) chatHistory.shift();
+            }
+
+            // Call Gemini API
+            const response = await callGemini(transcript, audioBase64, mimeType);
+
+            // Push Santa response to history
+            chatHistory.push({ role: 'model', text: response.text }); // 'model' is correct for Gemini
+            if (chatHistory.length > 10) chatHistory.shift();
+
+            santaText.innerText = response.text;
+            speak(response.text);
+
+            if (response.success) {
+                setTimeout(() => {
+                    dialogModal.classList.remove('show');
+                    triggerGiftSequence();
+                }, 3000);
+            }
+        }
+
+        async function callGemini(userText, audioBase64, mimeType) {
             // Build Context string
             const historyStr = chatHistory.slice(-4).map(h => `${h.role}: ${h.text}`).join('\\n');
 
-            const prompt = `
+            const systemPrompt = `
             You are Santa Claus talking to a 6-year old Japanese girl named Miyako.
             Your goal is to give her a present, but you forgot what she wanted.
-            You must guide her to say she wants "Elsa's Dress" (from Frozen).
+            She wants "Elsa's Dress" (Frozen).
             
-            
-            Current Conversation:
+            History:
             ${historyStr}
-            User: ${userText}
             
-            Speak in a warm, gentle, and natural grandfatherly tone (Japanese).
-            Avoid being robotic. It's okay to be a little chatty (up to 2 sentences).
+            Instructions:
+            1. If input is Audio, listen to the child's voice.
+            2. If she says "Yes", "Un", "Hai" to your previous question, OR asks for Elsa/Dress, RETURN success=true.
+            3. If undefined/noise, ask gently again.
+            4. Speak in warm Japanese.
             
-            Important Logic:
-            - If she says "Yes", "Un", "Hai" to your question about Elsa/Princess/Dress, ACT AS IF SHE CONFIRMED IT. Say: "Oh ho ho! Elsa's Dress! I have it right here!"
-            - If she says something vague, ask gently: "Is it blue?" or "Is it for a princess?".
-            - If she explicitly asks for Elsa/Frozen/Dress, celebrate immediately.
-            
-            Return JSON: { "text": "YOUR_RESPONSE", "success": boolean }
+            Return JSON: { "text": "RESPONSE", "success": boolean }
             `;
+
+            // Prepare Contents
+            const parts = [{ text: systemPrompt }];
+
+            if (userText) {
+                parts.push({ text: `User: ${userText}` });
+            } else if (audioBase64) {
+                parts.push({
+                    inlineData: {
+                        mimeType: mimeType,
+                        data: audioBase64
+                    }
+                });
+                parts.push({ text: "Please process this audio input." });
+            }
 
             // Switch to Gemini 2.0 Flash as requested
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
@@ -627,7 +742,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }]
+                        contents: [{ parts: parts }]
                     })
                 });
                 const data = await res.json();
@@ -640,38 +755,31 @@
                     throw new Error("No candidates returned");
                 }
 
-                const rawText = data.candidates[0].content.parts[0].text;
+                let rawText = data.candidates[0].content.parts[0].text;
 
                 // Cleanup JSON if needed (Gemini might wrap in ```json)
                 const jsonStr = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
                 return JSON.parse(jsonStr);
 
             } catch (e) {
-                console.error("API Failed, using Rule-Based Fallback", e);
+                console.error("API Failed", e);
+                // Fallback Logic (Only for Text if available, otherwise generic)
+                if (userText) {
+                    // Rule-Based Logic (Fallback) WITH CONTEXT
+                    const lower = userText.toLowerCase();
+                    const lastSantaMsg = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].text : "";
 
-                // Rule-Based Logic (Fallback) WITH CONTEXT
-                const lower = userText.toLowerCase();
-                const lastSantaMsg = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].text : "";
+                    const wasAskedAboutTarget = lastSantaMsg.includes('エルサ') || lastSantaMsg.includes('プリンセス') || lastSantaMsg.includes('ドレス');
 
-                // Check if last question was about the target
-                const wasAskedAboutTarget = lastSantaMsg.includes('エルサ') || lastSantaMsg.includes('プリンセス') || lastSantaMsg.includes('ドレス');
+                    if (lower.includes('エルサ') || lower.includes('ドレス') || lower.includes('アナ雪') || lower.includes('プリンセス') || lower.includes('dress') || lower.includes('elsa') || lower.includes('frozen')) {
+                        return { text: "おお！エルサのドレスだね！もちろん持っているよ！", success: true };
+                    }
+                    else if ((lower.includes('はい') || lower.includes('うん') || lower.includes('yes')) && wasAskedAboutTarget) {
+                        return { text: "おお！エルサのドレスだね！もちろん持っているよ！", success: true };
+                    }
+                }
 
-                if (lower.includes('エルサ') || lower.includes('ドレス') || lower.includes('アナ雪') || lower.includes('プリンセス') || lower.includes('dress') || lower.includes('elsa') || lower.includes('frozen')) {
-                    return { text: "おお！エルサのドレスだね！もちろん持っているよ！", success: true };
-                }
-                // Context Aware Yes
-                else if ((lower.includes('はい') || lower.includes('うん') || lower.includes('yes')) && wasAskedAboutTarget) {
-                    return { text: "おお！エルサのドレスだね！もちろん持っているよ！", success: true };
-                }
-                else {
-                    const fallbackResponses = [
-                        "ん？よく聞こえなかったな。青い色のものかな？",
-                        "プリンセスが着るものかな？",
-                        "キラキラしているものかい？",
-                        "「エルサ」が好きだったかな？"
-                    ];
-                    return { text: fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)], success: false };
-                }
+                return { text: "ん？よく聞こえなかったよ。もう一度教えてくれるかな？", success: false };
             }
         }
 
