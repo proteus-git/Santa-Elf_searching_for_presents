@@ -6,25 +6,38 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="images/santa2you.png">
     <title>サンタとエルフ - Stage 3</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&display=swap');
 
+
         body {
             margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
             background: #87CEEB;
             touch-action: none;
             font-family: 'Segoe UI', sans-serif;
         }
 
+        /* 16:9 Container */
         #game-container {
             position: absolute;
-            top: 0;
-            left: 0;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             width: 100vw;
-            height: 100vh;
+            height: 56.25vw;
+            /* 16:9 aspect ratio */
+            max-height: 100vh;
+            max-width: 177.78vh;
+            /* 16:9 aspect ratio */
+            background: #87CEEB;
             overflow: hidden;
+            user-select: none;
         }
 
         #bg {
@@ -50,6 +63,25 @@
         }
 
         /* Santa Chain - Resized 2x */
+        @keyframes sway {
+            0% {
+                transform: rotate(-15deg);
+            }
+
+            50% {
+                transform: rotate(15deg);
+            }
+
+            100% {
+                transform: rotate(-15deg);
+            }
+        }
+
+        .sway {
+            animation: sway 2s infinite ease-in-out;
+            transform-origin: 50% 100%;
+        }
+
         .santa-group {
             position: absolute;
             z-index: 100;
@@ -303,7 +335,7 @@
             </div>
         </div>
 
-        <div id="end-msg">Merry Christmas!</div>
+
     </div>
 
     <audio id="bgm" src="audio/christmas-song.mp3" loop></audio>
@@ -321,7 +353,7 @@
 
         // State
         let state = 'INIT';
-        let mouse = { x: 0, y: 0 };
+        let mouse = { x: 0, y: 0 }; // initGame()で適切に初期化される
         let finaleStartTime = 0;
         let apiKey = localStorage.getItem('gemini_api_key');
 
@@ -393,6 +425,12 @@
 
         function initGame() {
             console.log("Game Initialized");
+
+            // マウスの初期位置をゲームコンテナ中央に設定
+            const containerRect = container.getBoundingClientRect();
+            mouse.x = containerRect.width / 2;
+            mouse.y = containerRect.height / 2;
+
             // Spawn Animals (Larger)
             animals.forEach(a => {
                 const el = document.createElement('div');
@@ -412,20 +450,41 @@
         }
 
         document.addEventListener('mousemove', e => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
+            // ゲームコンテナ相対の座標に変換
+            const containerRect = container.getBoundingClientRect();
+            mouse.x = e.clientX - containerRect.left;
+            mouse.y = e.clientY - containerRect.top;
         });
 
+
         function miyakoEnter() {
+            const containerRect = container.getBoundingClientRect();
             miyako.style.display = 'block';
-            miyako.style.left = '50%';
-            miyako.style.top = '40%';
-            let top = 40;
+
+            // ゲームコンテナ中央から下部に向かって登場
+            const startLeft = containerRect.width / 2;
+            const startTop = containerRect.height * 0.4;
+
+            miyako.style.left = startLeft + 'px';
+            miyako.style.top = startTop + 'px';
+
+            let top = startTop;
+            let frameToggle = false;
+            const miyakoImg = miyako.querySelector('img');
+
+            // パラパラ漫画アニメーション (0.5秒間隔で画像切り替え)
+            const frameInterval = setInterval(() => {
+                frameToggle = !frameToggle;
+                miyakoImg.src = frameToggle ? 'images/MiyakoJump.png' : 'images/Miyako.png';
+            }, 500);
+
             const climb = setInterval(() => {
-                top += 0.5;
-                miyako.style.top = top + '%';
-                if (top >= 65) {
+                top += containerRect.height * 0.005; // 相対的な移動量
+                miyako.style.top = top + 'px';
+                if (top >= containerRect.height * 0.85) { // Ground level 0.85
                     clearInterval(climb);
+                    clearInterval(frameInterval); // アニメーション停止
+                    miyakoImg.src = 'images/Miyako.png'; // 最終フレームを通常画像に
                     state = 'MIYAKO_ACTIVE';
                     setTimeout(() => { state = 'SANTA_ENTER'; }, 1000);
                 }
@@ -435,41 +494,100 @@
         function loop(timestamp) {
             // MIYAKO Logic
             if (state === 'MIYAKO_ACTIVE' || state === 'SANTA_ENTER') {
+                const containerRect = container.getBoundingClientRect();
                 const mx = mouse.x;
-                const my = Math.min(mouse.y, window.innerHeight * 0.85);
-                const rect = miyako.getBoundingClientRect();
-                const curX = rect.left + rect.width / 2;
-                const curY = rect.top + rect.height;
-                miyako.style.left = (rect.left + (mx - curX) * 0.05) + 'px';
-                miyako.style.top = (rect.top + (my - curY) * 0.05) + 'px';
+                // const my = Math.min(mouse.y, containerRect.height * 0.85);
+
+                // 現在の位置を取得（ゲームコンテナ相対）
+                const currentLeft = parseFloat(miyako.style.left) || containerRect.width / 2;
+                // const currentTop = parseFloat(miyako.style.top) || containerRect.height * 0.4;
+                const groundY = containerRect.height * 0.85;
+
+                // マウスに向かって滑らかに移動 (X ONLY)
+                const newLeft = currentLeft + (mx - currentLeft) * 0.05;
+                // const newTop = currentTop + (my - currentTop) * 0.05;
+
+                miyako.style.left = newLeft + 'px';
+                miyako.style.top = groundY + 'px'; // Fixed Ground Y
             }
 
             // Santa Logic
             let targetX, targetY;
+            let currentScale = 1;
+
             if (state === 'SANTA_ENTER' || state === 'FINALE_INTERACT') {
                 targetX = mouse.x;
                 targetY = mouse.y - 200; // Increased offset for bigger santa
             } else if (state === 'FINALE') {
                 if (!finaleStartTime) finaleStartTime = timestamp;
                 const elapsed = timestamp - finaleStartTime;
+
+                const loopDuration = 6000; // 3 loops in 6 seconds
+                const flyAwayDuration = 3000; // 3 seconds to fly away
+
                 const centerX = window.innerWidth / 2;
-                const centerY = window.innerHeight / 2;
+                const centerY = window.innerHeight * 0.4; // Slightly higher than center (around treehouse)
                 const radius = 300;
-                if (elapsed < 5000) {
-                    const angle = (elapsed / 5000) * Math.PI * 4;
+
+                // Phase 1: 3 Loops around TreeHouse
+                if (elapsed < loopDuration) {
+                    // 3 Loops = 6PI
+                    const progress = elapsed / loopDuration;
+                    const angle = progress * Math.PI * 6;
+
                     targetX = centerX + Math.cos(angle) * radius;
                     targetY = centerY + Math.sin(angle) * radius;
-                } else {
+
+                    // Allow slight vertical bobbing
+                    targetY += Math.sin(progress * Math.PI * 10) * 50;
+
+                }
+                // Phase 2: Fly Away to Top-Right
+                else if (elapsed < loopDuration + flyAwayDuration) {
+                    const flyProgress = (elapsed - loopDuration) / flyAwayDuration;
+
+                    // Start from last circle position (which at 6PI is angle 0 => right side)
+                    const startX = centerX + radius;
+                    const startY = centerY;
+
+                    const endX = window.innerWidth * 1.5; // Far Right
+                    const endY = -500; // Sky High
+
+                    targetX = startX + (endX - startX) * flyProgress;
+                    targetY = startY + (endY - startY) * flyProgress;
+
+                    // Shrink Logic
+                    // Shrink Logic
+                    currentScale = 1 - flyProgress;
+                    /* Old manual logic removed */
+                    // Apply scale to Santa Group
+                    // Note: updatePos handles translation primarily. We need to add scale logic there or apply direct here.
+                    // Doing direct assignment to transform is risky if updatePos overwrites it.
+                    // Let's modify the elements directly here for scale, assuming updatePos handles translation.
+                    document.getElementById('reindeer').style.transform = `translate(${reindeerPos.x}px, ${reindeerPos.y}px) scale(${scale})`;
+                    document.getElementById('sleigh').style.transform = `translate(${sleighPos.x}px, ${sleighPos.y}px) scale(${scale})`;
+                    document.getElementById('santa').style.transform = `translate(${santaPos.x}px, ${santaPos.y}px) scale(${scale})`;
+
+                    // Skip regular updatePos call for this phase to avoid conflict? 
+                    // No, updatePos just sets translate. We can use a custom update here.
+                    // Let's set a flag or just override down below. 
+                    // Actually, updatePos overrides transform completely: `translate(...)`.
+                    // So we must NOT call standard updatePos below if we set it here.
+                    // Or better, updatePos should support scale.
+                    // Let's modify updatePos logic.
+                }
+                else {
+                    // Gone
                     targetX = window.innerWidth * 2;
-                    targetY = -500;
-                    document.getElementById('end-msg').style.transform = 'translate(-50%, -50%) scale(1)';
+                    targetY = -1000;
+                    currentScale = 0;
                 }
             } else {
                 targetX = santaPos.x;
                 targetY = santaPos.y;
             }
 
-            if (state === 'SANTA_ENTER' || state === 'FINALE' || state === 'FINALE_INTERACT') {
+            if (state === 'SANTA_ENTER' || state === 'FINALE' || state === 'FINALE_INTERACT' || state === 'FINALE_HOVER') {
                 const smoothing = 0.05;
                 reindeerPos.x += (targetX - reindeerPos.x) * smoothing;
                 reindeerPos.y += (targetY - reindeerPos.y) * smoothing;
@@ -478,9 +596,9 @@
                 santaPos.x += (sleighPos.x - santaPos.x - 100) * smoothing;
                 santaPos.y += (sleighPos.y - santaPos.y) * smoothing;
 
-                updatePos('reindeer', reindeerPos);
-                updatePos('sleigh', sleighPos);
-                updatePos('santa', santaPos);
+                updatePos('reindeer', reindeerPos, currentScale);
+                updatePos('sleigh', sleighPos, currentScale);
+                updatePos('santa', santaPos, currentScale);
 
                 // Collision Check (Santa touches Miyako) - Adjusted for size (2x -> 200px threshold)
                 if (state === 'SANTA_ENTER') {
@@ -590,11 +708,57 @@
                 warmUp.volume = 0;
                 window.speechSynthesis.speak(warmUp);
 
+                /*
+                // Strategy: Try Direct Audio (Multimodal) FIRST - DEPRECATED
+                // Reverting to STT Priority for reliability
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+                // Priority 1: SpeechRecognition
+                if (SpeechRecognition) {
+
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        debugLog('Mic stream acquired');
+
+                        let mimeType = 'audio/webm';
+                        if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+
+                        mediaRecorder = new MediaRecorder(stream, { mimeType });
+                        audioChunks = [];
+
+                        mediaRecorder.ondataavailable = (e) => {
+                            if (e.data.size > 0) audioChunks.push(e.data);
+                        };
+
+                        mediaRecorder.onstop = async () => {
+                            isListening = false;
+                            micBtn.classList.remove('listening');
+                            micHint.innerText = "ボタンを押して話してね";
+
+                            const audioBlob = new Blob(audioChunks, { type: mimeType });
+                            const base64Audio = await blobToBase64(audioBlob);
+                            handleVoiceInput(null, base64Audio, mimeType);
+
+                            stream.getTracks().forEach(track => track.stop());
+                        };
+
+                        mediaRecorder.start();
+                        isListening = true;
+                        micBtn.classList.add('listening');
+                        micHint.innerText = "録音中... (もう一度押すと送信)";
+                        debugLog('Recording started...');
+                        return; // Exit if successful
+                    } catch (err) {
+                        console.warn("MediaRecorder failed, falling back to STT", err);
+                    }
+                }
+                */
+
+                // Fallback: SpeechRecognition (STT)
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 debugLog('SpeechRecognition check: ' + (SpeechRecognition ? 'Available' : 'NOT Available'));
                 if (SpeechRecognition) {
                     if (!recognition) {
-                        // Re-init if needed
                         recognition = new SpeechRecognition();
                         recognition.lang = 'ja-JP';
                         recognition.continuous = false;
@@ -606,41 +770,10 @@
                         };
                     }
                     recognition.start();
-                    showModeIndicator("Standard Mode");
+                    showModeIndicator("Standard Mode (STT)");
                     debugLog('Mode: Standard (STT)');
                 } else {
-                    // Fallback: MediaRecorder
-                    debugLog('Mode: iOS Direct Audio (MediaRecorder)');
-                    showModeIndicator("iOS Mode (Direct)"); // Show indicator
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    debugLog('Mic stream acquired');
-                    let mimeType = 'audio/webm';
-                    if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-
-                    mediaRecorder = new MediaRecorder(stream, { mimeType });
-                    audioChunks = [];
-
-                    mediaRecorder.ondataavailable = (e) => {
-                        if (e.data.size > 0) audioChunks.push(e.data);
-                    };
-
-                    mediaRecorder.onstop = async () => {
-                        isListening = false;
-                        micBtn.classList.remove('listening');
-                        micHint.innerText = "ボタンを押して話してね";
-
-                        const audioBlob = new Blob(audioChunks, { type: mimeType });
-                        const base64Audio = await blobToBase64(audioBlob);
-                        handleVoiceInput(null, base64Audio, mimeType);
-
-                        stream.getTracks().forEach(track => track.stop());
-                    };
-
-                    mediaRecorder.start();
-                    isListening = true;
-                    micBtn.classList.add('listening');
-                    micHint.innerText = "録音中... (もう一度押すと送信)";
-                    debugLog('Recording started...');
+                    alert("マイクが使えません。");
                 }
             } catch (e) {
                 console.error(e);
@@ -766,7 +899,7 @@
             Instructions:
             1. If input is Audio, listen to the child's voice.
             2. If she says "Yes", "Un", "Hai" to your previous question, OR asks for Elsa/Dress, RETURN success=true.
-            3. If undefined/noise, ask gently again.
+            3. If she asks for something else (e.g. Bag, Toy), Do NOT return success=true. Instead, guide her gently: "Are you sure? Didn't you want a sparkly blue dress? (Frozen?)" or "I thought you wanted something like a Princess?"
             4. Speak in warm Japanese.
             
             Return JSON: { "text": "RESPONSE", "success": boolean }
@@ -824,15 +957,24 @@
 
                     const wasAskedAboutTarget = lastSantaMsg.includes('エルサ') || lastSantaMsg.includes('プリンセス') || lastSantaMsg.includes('ドレス');
 
-                    if (lower.includes('エルサ') || lower.includes('ドレス') || lower.includes('アナ雪') || lower.includes('プリンセス') || lower.includes('dress') || lower.includes('elsa') || lower.includes('frozen')) {
-                        return { text: "おお！エルサのドレスだね！もちろん持っているよ！", success: true };
+                    // 1. Correct Answer triggers
+                    if (lower.includes("エルサ") || lower.includes("ドレス") || lower.includes("frozen") || lower.includes("dress")) {
+                        return { text: "おお！そうだ、エルサのドレスだったね！", success: true };
                     }
-                    else if ((lower.includes('はい') || lower.includes('うん') || lower.includes('yes')) && wasAskedAboutTarget) {
-                        return { text: "おお！エルサのドレスだね！もちろん持っているよ！", success: true };
+                    // 2. Common Wrong Answers (Guiding)
+                    if (lower.includes("鞄") || lower.includes("かばん") || lower.includes("bag") ||
+                        lower.includes("おもちゃ") || lower.includes("toy") || lower.includes("game")) {
+                        return { text: "え？本当に？ピカピカの青いドレス（アナ雪）じゃなかったっけ？", success: false };
+                    }
+                    // 3. Affirmation to previous question
+                    if (lower.includes("うん") || lower.includes("はい") || lower.includes("yes")) {
+                        // We assume this might be a confirmation to "Did you want a dress?"
+                        return { text: "よし、わかった！プレゼントをあげよう！", success: true };
                     }
                 }
+                // ---------------------------------------------------------------
 
-                return { text: "ん？よく聞こえなかったよ。もう一度教えてくれるかな？", success: false };
+                return { text: "ん？ごめんね、ちょっと通信の調子が悪いみたい。もう一度言ってくれる？", success: false };
             }
         }
 
@@ -875,6 +1017,9 @@
                     gift.innerHTML = `<img src="images/${giftImg}">`;
                     boy.appendChild(gift);
 
+                    // Add Sway Animation
+                    boy.classList.add('sway');
+
                     // Check Finale
                     if (boysGiven.arata && boysGiven.takeru) {
                         setTimeout(triggerFinale, 1000);
@@ -884,25 +1029,57 @@
         }
 
         function triggerFinale() {
-            const cheers = document.createElement('div');
-            cheers.innerText = "ありがとう！サンタさん！";
-            cheers.style.position = 'absolute';
-            cheers.style.left = '50%'; cheers.style.top = '30%';
-            cheers.style.transform = 'translate(-50%, 0)';
-            cheers.style.fontFamily = 'Mountains of Christmas';
-            cheers.style.fontSize = '40px';
-            cheers.style.color = 'white';
-            cheers.style.textShadow = '0 0 5px black';
-            container.appendChild(cheers);
+            // SVG Arched Text
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("width", "100%");
+            svg.setAttribute("height", "100%");
+            svg.style.position = "absolute";
+            svg.style.top = "0";
+            svg.style.left = "0";
+            svg.style.pointerEvents = "none";
+            svg.style.zIndex = "2000";
 
-            setTimeout(() => {
-                cheers.remove();
-                state = 'FINALE';
-            }, 2000);
+            // Define Path
+            const defs = document.createElementNS(svgNS, "defs");
+            const path = document.createElementNS(svgNS, "path");
+            path.setAttribute("id", "archPath");
+            // A curve from left to right, arching up near top (e.g. y=150)
+            // M 10%,300 Q 50%,100 90%,300
+            path.setAttribute("d", `M ${window.innerWidth * 0.1},300 Q ${window.innerWidth / 2},50 ${window.innerWidth * 0.9},300`);
+            defs.appendChild(path);
+            svg.appendChild(defs);
+
+            const text = document.createElementNS(svgNS, "text");
+            text.setAttribute("font-family", "Mountains of Christmas");
+            text.setAttribute("font-size", "160"); // DOUBLE SIZE
+            text.setAttribute("fill", "white"); // White text
+            text.setAttribute("font-weight", "bold");
+            text.setAttribute("text-anchor", "middle"); // Center align
+
+            // Text Shadow effect via filter or simple duplicate? SVG filter is complex. 
+            // Let's just use CSS for shadow on the SVG text provided supported browser or stroke.
+            text.setAttribute("stroke", "black");
+            text.setAttribute("stroke-width", "2");
+
+            const textPath = document.createElementNS(svgNS, "textPath");
+            textPath.setAttributeNS("http://www.w3.org/1999/xlink", "href", "#archPath");
+            textPath.setAttribute("startOffset", "50%");
+            textPath.textContent = "Merry Christmas!";
+
+            text.appendChild(textPath);
+            svg.appendChild(text);
+            container.appendChild(svg);
+
+            state = 'FINALE';
+            // No auto-remove? User didn't ask to remove. 
+            // But previous code removed it. "Merry Christmas! ... -> FINALE state".
+            // Finale state makes Santa fly away. 
+            // Let's keep the text on screen while Santa flies away.
         }
 
-        function updatePos(id, pos) {
-            document.getElementById(id).style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+        function updatePos(id, pos, scale = 1) {
+            document.getElementById(id).style.transform = `translate(${pos.x}px, ${pos.y}px) scale(${scale})`;
         }
 
         function triggerGiftSequence() {
@@ -949,11 +1126,19 @@
                         setTimeout(() => {
                             overlay.classList.remove('show');
 
-                            // START SPIN on Main Character
+                            // START SPIN
                             startMiyakoSpin();
 
-                            state = 'FINALE_PREP';
-                            startFinalePrep();
+                            // State: HOVER (Santa waits)
+                            state = 'FINALE_HOVER';
+                            createChar('arata', 'images/Arata.png', 30, 80);
+                            createChar('takeru', 'images/Takeru.png', 60, 80);
+
+                            // Transition to INTERACT after 4 seconds
+                            setTimeout(() => {
+                                state = 'FINALE_INTERACT';
+                            }, 4000);
+
                         }, 2000);
                     }, 500);
                 }, 1500);
@@ -961,6 +1146,15 @@
         }
 
         function startMiyakoSpin() {
+            // Move Miyako to TreeHouse Door Position (approx 50%, 40%)
+            const containerRect = container.getBoundingClientRect();
+            miyako.style.left = (containerRect.width / 2) + 'px';
+            miyako.style.top = (containerRect.height * 0.4) + 'px';
+
+            // Correct Aspect Ratio for the spin animation (fix "vertical compression")
+            miyako.style.height = '230px';
+            miyako.style.width = '140px';
+
             // Replace IMG with Div for Sprite Anim to animate `miyako_4dirDress.png`
             // Assuming the sprite sheet is 4 frames horizontal.
             miyako.innerHTML = '<div id="miyako-sprite" style="width:100%; height:100%; background: url(images/miyako_4dirDress.png) no-repeat; background-size: 400% 100%;"></div>';
