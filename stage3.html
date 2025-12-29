@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="images/santa2you.png">
+    <title>サンタとエルフ - Stage 3</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&display=swap');
+
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #87CEEB;
+            touch-action: none;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        /* 16:9 Container */
+        #game-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100vw;
+            height: 56.25vw;
+            /* 16:9 aspect ratio */
+            max-height: 100vh;
+            max-width: 177.78vh;
+            /* 16:9 aspect ratio */
+            background: #87CEEB;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #bg {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+        }
+
+        .game-object {
+            position: absolute;
+            transform-origin: center bottom;
+            pointer-events: none;
+            transition: all 0.5s;
+            z-index: 10;
+        }
+
+        .game-object img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* Santa Chain - Resized 2x */
+        @keyframes sway {
+            0% {
+                transform: rotate(-15deg);
+            }
+
+            50% {
+                transform: rotate(15deg);
+            }
+
+            100% {
+                transform: rotate(-15deg);
+            }
+        }
+
+        .sway {
+            animation: sway 2s infinite ease-in-out;
+            transform-origin: 50% 100%;
+        }
+
+        .santa-group {
+            position: absolute;
+            z-index: 100;
+            pointer-events: none;
+            transform-origin: center center;
+        }
+
+        .santa-group img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* Dialog UI */
+        #dialog-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 80%;
+            max-width: 600px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            padding: 20px;
+            z-index: 5000;
+            transition: transform 0.3s;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+
+        #dialog-modal.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .dialog-text {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 10px;
+            min-height: 60px;
+        }
+
+        /* Voice UI */
+        #mic-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: #e74c3c;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.1s, background 0.3s;
+        }
+
+        #mic-btn:active {
+            transform: scale(0.95);
+        }
+
+        #mic-btn.listening {
+            background: #2ecc71;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7);
+            }
+
+            70% {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 20px rgba(46, 204, 113, 0);
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(46, 204, 113, 0);
+            }
+        }
+
+        /* API Key Modal */
+        #api-key-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+        }
+
+        #api-key-input {
+            padding: 10px;
+            font-size: 1.2rem;
+            width: 300px;
+            margin: 20px;
+            font-family: monospace;
+        }
+
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            background: #95a5a6;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        /* Gift Overlay */
+        #gift-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 6000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #gift-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .overlay-content {
+            display: flex;
+            align-items: center;
+            gap: 50px;
+            transform: scale(0.8);
+            transition: transform 0.5s;
+        }
+
+        .overlay-char {
+            height: 400px;
+            object-fit: contain;
+        }
+
+        /* Larger */
+        .sparkle {
+            animation: spin 3s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes sway {
+            0% {
+                transform: rotate(-10deg);
+            }
+
+            100% {
+                transform: rotate(10deg);
+            }
+        }
+
+        /* Finale Text */
+        #end-msg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-family: 'Mountains of Christmas', cursive;
+            font-size: 5rem;
+            background: linear-gradient(to right, #ff0000, #00ff00);
+            -webkit-background-clip: text;
+            color: transparent;
+            z-index: 7000;
+            transition: transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game-container">
+        <img id="bg" src="images/snow-coveredtreehouse.webp" alt="Background">
+
+        <!-- Interactive Layers -->
+        <div id="game-area"></div>
+
+        <!-- Characters (Dynamic) -->
+        <!-- Resized 2x: width ~70px -> ~140px -->
+        <div id="miyako" class="game-object" style="width: 140px; height: 180px; display: none;">
+            <img src="images/Miyako.png">
+        </div>
+
+        <!-- Santa Group Resized 2x -->
+        <div id="reindeer" class="santa-group" style="width: 200px; height: 200px;"><img src="images/reindeer2.png">
+        </div>
+        <div id="sleigh" class="santa-group" style="width: 240px; height: 240px;"><img src="images/sleigh2.png"></div>
+        <div id="santa" class="santa-group" style="width: 200px; height: 200px;"><img src="images/santa2.png"></div>
+
+        <!-- API Key Modal -->
+        <div id="api-key-modal">
+            <h2>Gemini API Key Setup</h2>
+            <p>Please enter your Gemini API Key to talk with Santa.</p>
+            <!-- Changed to TEXT for debug visibility -->
+            <input type="text" id="api-key-input" placeholder="AIzaSy...">
+            <button class="btn"
+                style="font-size: 1.2rem; padding: 10px 20px; background: #2ecc71; color: white; border: none; border-radius: 5px; cursor: pointer;"
+                onclick="saveApiKey()">Start Game</button>
+            <button class="btn-small" onclick="resetKey()">Reset Key</button>
+        </div>
+
+        <!-- Dialogue Modal -->
+        <div id="dialog-modal">
+            <h2 style="color: #c0392b;">🎅 サンタ</h2>
+            <div id="santa-text" class="dialog-text">あ、MIYAKOちゃん！ごめんごめん！プレゼント渡すのわすれてたよ！何が、欲しかったっけ？</div>
+            <button id="mic-btn" onclick="toggleMic()">🎤</button>
+            <p id="mic-hint" style="font-size: 0.8rem; color: #666;">ボタンを押して、マイクを許可して話してね（話し終わったらもう一度押す）</p>
+            <!-- Debug Display -->
+            <div id="debug-display"
+                style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 5px; font-size: 0.7rem; font-family: monospace; color: #333; max-height: 100px; overflow-y: auto;">
+            </div>
+        </div>
+
+        <!-- Gift Overlay -->
+        <div id="gift-overlay">
+            <div class="overlay-content">
+                <img src="images/santa2you.png" class="overlay-char">
+                <img id="overlay-gift" src="images/presentBox1.png" style="width: 200px;">
+                <img id="overlay-miyako" src="images/Miyako.png" class="overlay-char">
+            </div>
+        </div>
+
+
+    </div>
+
+    <audio id="bgm" src="audio/christmas-song.mp3" loop></audio>
+
+    <script>
+        const container = document.getElementById('game-container');
+        const miyako = document.getElementById('miyako');
+        const dialogModal = document.getElementById('dialog-modal');
+        const santaText = document.getElementById('santa-text');
+        const micBtn = document.getElementById('mic-btn');
+        const micHint = document.getElementById('mic-hint');
+        const bgm = document.getElementById('bgm');
+        const apiKeyModal = document.getElementById('api-key-modal');
+        const apiKeyInput = document.getElementById('api-key-input');
+
+        // State
+        let state = 'INIT';
+        let mouse = { x: 0, y: 0 }; // initGame()で適切に初期化される
+        let finaleStartTime = 0;
+        let apiKey = localStorage.getItem('gemini_api_key');
+
+        // Santa Physics
+        let reindeerPos = { x: -300, y: 100 };
+        let sleighPos = { x: -400, y: 100 };
+        let santaPos = { x: -500, y: 100 };
+
+        // Animals (Background) - Resized 2x (approx 120px)
+        const animals = [
+            { id: 'sq', img: 'images/リスばんざい.png', x: 20, y: 70, gift: 'images/どんぐり.png' },
+            { id: 'rb', img: 'images/ウサギばんざい.png', x: 40, y: 75, gift: 'images/にんじん.png' },
+            { id: 'gr', img: 'images/キリン横.png', x: 70, y: 60, gift: 'images/マフラー.png' },
+            { id: 'ln', img: 'images/LionSmile.png', x: 85, y: 70, gift: 'images/王冠.png' },
+            { id: 'cr', img: 'images/ワニ笑い.png', x: 10, y: 80, gift: 'images/歯ブラシ.png' }
+        ];
+
+        // --- Init & API Key ---
+        if (apiKey) {
+            console.log('Key found in localStorage');
+            apiKeyInput.value = apiKey;
+            document.querySelector('#api-key-modal h2').innerText = "Ready?";
+            document.querySelector('#api-key-modal p').innerText = "Click Start to enable audio";
+        } else {
+            console.log('No key found');
+        }
+
+        function saveApiKey() {
+            let key = apiKeyInput.value.trim();
+            console.log("Input value:", key, "Local variable:", apiKey);
+
+            // Fallback: if value is empty/masked but state has key
+            if (!key && apiKey) key = apiKey;
+
+            if (key) {
+                apiKey = key;
+                try {
+                    localStorage.setItem('gemini_api_key', key);
+                } catch (e) { console.error("LocalStorage error", e); }
+
+                apiKeyModal.style.display = 'none';
+
+                // Unlock Audio
+                if (bgm.paused) {
+                    bgm.play()
+                        .then(() => console.log('BGM playing'))
+                        .catch(e => console.log('BGM Error', e));
+                }
+
+                // iOS TTS Warmup
+                window.speechSynthesis.cancel();
+                const warmUp = new SpeechSynthesisUtterance('');
+                warmUp.volume = 0;
+                window.speechSynthesis.speak(warmUp);
+
+                initGame();
+            } else {
+                alert("API Keyが空です。入力してください。");
+            }
+        }
+
+        function resetKey() {
+            localStorage.removeItem('gemini_api_key');
+            apiKey = null;
+            apiKeyInput.value = '';
+            alert("API Keyをリセットしました。リロードしてください。");
+            location.reload();
+        }
+
+        function initGame() {
+            console.log("Game Initialized");
+
+            // マウスの初期位置をゲームコンテナ中央に設定
+            const containerRect = container.getBoundingClientRect();
+            mouse.x = containerRect.width / 2;
+            mouse.y = containerRect.height / 2;
+
+            // Spawn Animals (Larger)
+            animals.forEach(a => {
+                const el = document.createElement('div');
+                el.className = 'game-object';
+                el.style.left = a.x + '%';
+                el.style.top = a.y + '%';
+                el.style.width = '120px'; // 2x
+                el.style.height = '120px';
+                el.innerHTML = `<img src="${a.img}"><div style="position:absolute; top:-30%; left:20%; width:60px;"><img src="${a.gift}"></div>`;
+                el.style.animation = `sway ${2 + Math.random()}s infinite alternate ease-in-out`;
+                document.getElementById('game-area').appendChild(el);
+            });
+
+            // Start Sequence
+            setTimeout(miyakoEnter, 1000);
+            requestAnimationFrame(loop);
+        }
+
+        document.addEventListener('mousemove', e => {
+            // ゲームコンテナ相対の座標に変換
+            const containerRect = container.getBoundingClientRect();
+            mouse.x = e.clientX - containerRect.left;
+            mouse.y = e.clientY - containerRect.top;
+        });
+
+
+        function miyakoEnter() {
+            const containerRect = container.getBoundingClientRect();
+            miyako.style.display = 'block';
+
+            // ゲームコンテナ中央から下部に向かって登場
+            const startLeft = containerRect.width / 2;
+            const startTop = containerRect.height * 0.4;
+
+            miyako.style.left = startLeft + 'px';
+            miyako.style.top = startTop + 'px';
+
+            let top = startTop;
+            let frameToggle = false;
+            const miyakoImg = miyako.querySelector('img');
+
+            // パラパラ漫画アニメーション (0.5秒間隔で画像切り替え)
+            const frameInterval = setInterval(() => {
+                frameToggle = !frameToggle;
+                miyakoImg.src = frameToggle ? 'images/MiyakoJump.png' : 'images/Miyako.png';
+            }, 500);
+
+            const climb = setInterval(() => {
+                top += containerRect.height * 0.005; // 相対的な移動量
+                miyako.style.top = top + 'px';
+                if (top >= containerRect.height * 0.85) { // Ground level 0.85
+                    clearInterval(climb);
+                    clearInterval(frameInterval); // アニメーション停止
+                    miyakoImg.src = 'images/Miyako.png'; // 最終フレームを通常画像に
+                    state = 'MIYAKO_ACTIVE';
+                    setTimeout(() => { state = 'SANTA_ENTER'; }, 1000);
+                }
+            }, 20);
+        }
+
+        function loop(timestamp) {
+            // MIYAKO Logic
+            if (state === 'MIYAKO_ACTIVE' || state === 'SANTA_ENTER') {
+                const containerRect = container.getBoundingClientRect();
+                const mx = mouse.x;
+                // const my = Math.min(mouse.y, containerRect.height * 0.85);
+
+                // 現在の位置を取得（ゲームコンテナ相対）
+                const currentLeft = parseFloat(miyako.style.left) || containerRect.width / 2;
+                // const currentTop = parseFloat(miyako.style.top) || containerRect.height * 0.4;
+                const groundY = containerRect.height * 0.85;
+
+                // マウスに向かって滑らかに移動 (X ONLY)
+                const newLeft = currentLeft + (mx - currentLeft) * 0.05;
+                // const newTop = currentTop + (my - currentTop) * 0.05;
+
+                miyako.style.left = newLeft + 'px';
+                miyako.style.top = groundY + 'px'; // Fixed Ground Y
+            }
+
+            // Santa Logic
+            let targetX, targetY;
+            let currentScale = 1;
+
+            if (state === 'SANTA_ENTER' || state === 'FINALE_INTERACT') {
+                targetX = mouse.x;
+                targetY = mouse.y - 200; // Increased offset for bigger santa
+            } else if (state === 'FINALE') {
+                if (!finaleStartTime) finaleStartTime = timestamp;
+                const elapsed = timestamp - finaleStartTime;
+
+                const loopDuration = 6000; // 3 loops in 6 seconds
+                const flyAwayDuration = 3000; // 3 seconds to fly away
+
+                const centerX = window.innerWidth / 2;
+                const centerY = window.innerHeight * 0.4; // Slightly higher than center (around treehouse)
+                const radius = 300;
+
+                // Phase 1: 3 Loops around TreeHouse
+                if (elapsed < loopDuration) {
+                    // 3 Loops = 6PI
+                    const progress = elapsed / loopDuration;
+                    const angle = progress * Math.PI * 6;
+
+                    targetX = centerX + Math.cos(angle) * radius;
+                    targetY = centerY + Math.sin(angle) * radius;
+
+                    // Allow slight vertical bobbing
+                    targetY += Math.sin(progress * Math.PI * 10) * 50;
+
+                }
+                // Phase 2: Fly Away to Top-Right
+                else if (elapsed < loopDuration + flyAwayDuration) {
+                    const flyProgress = (elapsed - loopDuration) / flyAwayDuration;
+
+                    // Start from last circle position (which at 6PI is angle 0 => right side)
+                    const startX = centerX + radius;
+                    const startY = centerY;
+
+                    const endX = window.innerWidth * 1.5; // Far Right
+                    const endY = -500; // Sky High
+
+                    targetX = startX + (endX - startX) * flyProgress;
+                    targetY = startY + (endY - startY) * flyProgress;
+
+                    // Shrink Logic
+                    // Shrink Logic
+                    currentScale = 1 - flyProgress;
+                    /* Old manual logic removed */
+                    // Apply scale to Santa Group
+                    // Note: updatePos handles translation primarily. We need to add scale logic there or apply direct here.
+                    // Doing direct assignment to transform is risky if updatePos overwrites it.
+                    // Let's modify the elements directly here for scale, assuming updatePos handles translation.
+                    document.getElementById('reindeer').style.transform = `translate(${reindeerPos.x}px, ${reindeerPos.y}px) scale(${scale})`;
+                    document.getElementById('sleigh').style.transform = `translate(${sleighPos.x}px, ${sleighPos.y}px) scale(${scale})`;
+                    document.getElementById('santa').style.transform = `translate(${santaPos.x}px, ${santaPos.y}px) scale(${scale})`;
+
+                    // Skip regular updatePos call for this phase to avoid conflict? 
+                    // No, updatePos just sets translate. We can use a custom update here.
+                    // Let's set a flag or just override down below. 
+                    // Actually, updatePos overrides transform completely: `translate(...)`.
+                    // So we must NOT call standard updatePos below if we set it here.
+                    // Or better, updatePos should support scale.
+                    // Let's modify updatePos logic.
+                }
+                else {
+                    // Gone
+                    targetX = window.innerWidth * 2;
+                    targetY = -1000;
+                    currentScale = 0;
+                }
+            } else {
+                targetX = santaPos.x;
+                targetY = santaPos.y;
+            }
+
+            if (state === 'SANTA_ENTER' || state === 'FINALE' || state === 'FINALE_INTERACT' || state === 'FINALE_HOVER') {
+                const smoothing = 0.05;
+                reindeerPos.x += (targetX - reindeerPos.x) * smoothing;
+                reindeerPos.y += (targetY - reindeerPos.y) * smoothing;
+                sleighPos.x += (reindeerPos.x - sleighPos.x - 120) * smoothing; // Offset adjust
+                sleighPos.y += (reindeerPos.y - sleighPos.y) * smoothing;
+                santaPos.x += (sleighPos.x - santaPos.x - 100) * smoothing;
+                santaPos.y += (sleighPos.y - santaPos.y) * smoothing;
+
+                updatePos('reindeer', reindeerPos, currentScale);
+                updatePos('sleigh', sleighPos, currentScale);
+                updatePos('santa', santaPos, currentScale);
+
+                // Collision Check (Santa touches Miyako) - Adjusted for size (2x -> 200px threshold)
+                if (state === 'SANTA_ENTER') {
+                    const sRect = document.getElementById('santa').getBoundingClientRect();
+                    const mRect = miyako.getBoundingClientRect();
+                    const dist = Math.hypot(sRect.x - mRect.x, sRect.y - mRect.y);
+                    if (dist < 200) {
+                        state = 'DIALOG';
+                        dialogModal.classList.add('show');
+                        speak(santaText.innerText); // Initial speak
+                    }
+                }
+
+                // Collision Check for Arata/Takeru
+                if (state === 'FINALE_INTERACT') {
+                    checkBoyInteract('arata', 'LEGO.png');
+                    checkBoyInteract('takeru', 'のりものずかん.png');
+                }
+            }
+            createStars();
+            requestAnimationFrame(loop);
+        }
+
+        // --- Voice & AI Logic ---
+        let recognition;
+        let isListening = false;
+
+        // Debug Helper
+        function debugLog(msg) {
+            console.log('[DEBUG]', msg);
+            const el = document.getElementById('debug-display');
+            if (el) {
+                el.innerHTML += msg + '<br>';
+                el.scrollTop = el.scrollHeight;
+            }
+        }
+
+
+
+        try {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            // Explicitly verify support (iOS returns undefined mostly)
+            if (!SpeechRecognition) throw new Error("Speech Recognition Not Supported");
+
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.classList.add('listening');
+                micHint.innerText = "聞いています... (もう一度押すと送信)";
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                micBtn.classList.remove('listening');
+                micHint.innerText = "ボタンを押して話してね";
+            };
+
+            recognition.onresult = async (event) => {
+                if (event.results[0].isFinal) {
+                    const transcript = event.results[0][0].transcript;
+                    isListening = false;
+                    micBtn.classList.remove('listening');
+                    handleVoiceInput(transcript);
+                }
+            };
+
+            recognition.onerror = (e) => {
+                console.error(e);
+                if (e.error === 'no-speech') {
+                    // Just ignore or reset UI
+                }
+            };
+        } catch (e) {
+            console.warn('Speech API not supported (iOS/Safari etc). Switching to Text Mode.');
+            // Switch UI to Text Mode
+            micBtn.style.display = 'none';
+            micHint.innerText = "マイクが使えないため、文字で入力してね↓";
+            textInputContainer.style.display = 'block';
+        }
+
+        let mediaRecorder;
+        let audioChunks = [];
+
+        async function toggleMic() {
+            if (!apiKey) return alert("API Keyを入力してください");
+
+            if (isListening) {
+                // Stop
+                if (recognition) recognition.stop();
+                if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+                return;
+            }
+
+            // Start
+            try {
+                debugLog('toggleMic: Starting...');
+                if (bgm.paused) bgm.play().catch(e => console.log(e));
+                window.speechSynthesis.cancel();
+
+                // iOS Audio Warmup (Silent)
+                const warmUp = new SpeechSynthesisUtterance('');
+                warmUp.volume = 0;
+                window.speechSynthesis.speak(warmUp);
+
+                /*
+                // Strategy: Try Direct Audio (Multimodal) FIRST - DEPRECATED
+                // Reverting to STT Priority for reliability
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+                // Priority 1: SpeechRecognition
+                if (SpeechRecognition) {
+
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        debugLog('Mic stream acquired');
+
+                        let mimeType = 'audio/webm';
+                        if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+
+                        mediaRecorder = new MediaRecorder(stream, { mimeType });
+                        audioChunks = [];
+
+                        mediaRecorder.ondataavailable = (e) => {
+                            if (e.data.size > 0) audioChunks.push(e.data);
+                        };
+
+                        mediaRecorder.onstop = async () => {
+                            isListening = false;
+                            micBtn.classList.remove('listening');
+                            micHint.innerText = "ボタンを押して話してね";
+
+                            const audioBlob = new Blob(audioChunks, { type: mimeType });
+                            const base64Audio = await blobToBase64(audioBlob);
+                            handleVoiceInput(null, base64Audio, mimeType);
+
+                            stream.getTracks().forEach(track => track.stop());
+                        };
+
+                        mediaRecorder.start();
+                        isListening = true;
+                        micBtn.classList.add('listening');
+                        micHint.innerText = "録音中... (もう一度押すと送信)";
+                        debugLog('Recording started...');
+                        return; // Exit if successful
+                    } catch (err) {
+                        console.warn("MediaRecorder failed, falling back to STT", err);
+                    }
+                }
+                */
+
+                // Fallback: SpeechRecognition (STT)
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                debugLog('SpeechRecognition check: ' + (SpeechRecognition ? 'Available' : 'NOT Available'));
+                if (SpeechRecognition) {
+                    if (!recognition) {
+                        recognition = new SpeechRecognition();
+                        recognition.lang = 'ja-JP';
+                        recognition.continuous = false;
+                        recognition.interimResults = true;
+                        recognition.onstart = () => { isListening = true; micBtn.classList.add('listening'); micHint.innerText = "聞いています..."; };
+                        recognition.onend = () => { isListening = false; micBtn.classList.remove('listening'); micHint.innerText = "ボタンを押して話してね"; };
+                        recognition.onresult = (e) => {
+                            if (e.results[0].isFinal) handleVoiceInput(e.results[0][0].transcript);
+                        };
+                    }
+                    recognition.start();
+                    showModeIndicator("Standard Mode (STT)");
+                    debugLog('Mode: Standard (STT)');
+                } else {
+                    alert("マイクが使えません。");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("マイクエラー: " + e.message);
+            }
+        }
+
+        // Unobtrusive Mode Indicator
+        function showModeIndicator(text) {
+            let el = document.getElementById('mode-indicator');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'mode-indicator';
+                el.style.position = 'absolute';
+                el.style.bottom = '5px';
+                el.style.right = '5px';
+                el.style.fontSize = '10px';
+                el.style.color = 'rgba(255,255,255,0.3)'; // Very subtle
+                el.style.pointerEvents = 'none';
+                el.style.fontFamily = 'sans-serif';
+                document.body.appendChild(el);
+            }
+            el.innerText = text;
+        }
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64String = reader.result.split(',')[1];
+                    resolve(base64String);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        async function handleVoiceInput(transcript) {
+            console.log('Final:', transcript);
+
+            // Push user text to history
+            chatHistory.push({ role: 'user', text: transcript });
+            if (chatHistory.length > 10) chatHistory.shift();
+
+            // Call Gemini API
+            const response = await callGemini(transcript);
+
+            // Push Santa response to history
+            chatHistory.push({ role: 'santa', text: response.text });
+            if (chatHistory.length > 10) chatHistory.shift();
+
+            santaText.innerText = response.text;
+            speak(response.text);
+
+            if (response.success) {
+                setTimeout(() => {
+                    dialogModal.classList.remove('show');
+                    triggerGiftSequence();
+                }, 3000);
+            }
+        }
+
+        function speak(text) {
+            window.speechSynthesis.cancel();
+            const ut = new SpeechSynthesisUtterance(text);
+            ut.lang = 'ja-JP';
+            ut.pitch = 0.6; // Deep voice
+            ut.rate = 0.8;  // Slow, calm pace
+
+            // Try to select a Japanese voice (Google or Microsoft)
+            const voices = window.speechSynthesis.getVoices();
+            const jpVoice = voices.find(v => v.lang.includes('ja') && (v.name.includes('Google') || v.name.includes('Ichiro')));
+            if (jpVoice) ut.voice = jpVoice;
+
+            window.speechSynthesis.speak(ut);
+        }
+
+        // Chat History for Context
+        let chatHistory = [];
+
+        async function handleVoiceInput(transcript, audioBase64 = null, mimeType = null) {
+            console.log('Input:', transcript ? transcript : '[Audio Data]');
+            debugLog('handleVoiceInput called - Text: ' + (transcript || 'NONE') + ', Audio: ' + (audioBase64 ? (audioBase64.length + ' bytes') : 'NONE'));
+
+            // Push user text to history ONLY if transcript exists
+            if (transcript) {
+                chatHistory.push({ role: 'user', text: transcript });
+                if (chatHistory.length > 10) chatHistory.shift();
+            }
+
+            // Call Gemini API
+            debugLog('Calling Gemini API...');
+            const response = await callGemini(transcript, audioBase64, mimeType);
+            debugLog('Gemini response: ' + JSON.stringify(response));
+
+            // Push Santa response to history
+            chatHistory.push({ role: 'model', text: response.text }); // 'model' is correct for Gemini
+            if (chatHistory.length > 10) chatHistory.shift();
+
+            santaText.innerText = response.text;
+            speak(response.text);
+
+            if (response.success) {
+                setTimeout(() => {
+                    dialogModal.classList.remove('show');
+                    triggerGiftSequence();
+                }, 3000);
+            }
+        }
+
+        async function callGemini(userText, audioBase64, mimeType) {
+            // Build Context string
+            const historyStr = chatHistory.slice(-4).map(h => `${h.role}: ${h.text}`).join('\\n');
+
+            const systemPrompt = `
+            You are Santa Claus talking to a 6-year old Japanese girl named Miyako.
+            Your goal is to give her a present, but you forgot what she wanted.
+            She wants "Elsa's Dress" (Frozen).
+            
+            History:
+            ${historyStr}
+            
+            Instructions:
+            1. If input is Audio, listen to the child's voice.
+            2. If she says "Yes", "Un", "Hai" to your previous question, OR asks for Elsa/Dress, RETURN success=true.
+            3. If she asks for something else (e.g. Bag, Toy), Do NOT return success=true. Instead, guide her gently: "Are you sure? Didn't you want a sparkly blue dress? (Frozen?)" or "I thought you wanted something like a Princess?"
+            4. Speak in warm Japanese.
+            
+            Return JSON: { "text": "RESPONSE", "success": boolean }
+            `;
+
+            // Prepare Contents
+            const parts = [{ text: systemPrompt }];
+
+            if (userText) {
+                parts.push({ text: `User: ${userText}` });
+            } else if (audioBase64) {
+                parts.push({
+                    inlineData: {
+                        mimeType: mimeType,
+                        data: audioBase64
+                    }
+                });
+                parts.push({ text: "Please process this audio input." });
+            }
+
+            // Switch to Gemini 2.0 Flash as requested
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: parts }]
+                    })
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    throw new Error(data.error.message || "API Error");
+                }
+
+                if (!data.candidates || !data.candidates[0]) {
+                    throw new Error("No candidates returned");
+                }
+
+                let rawText = data.candidates[0].content.parts[0].text;
+
+                // Cleanup JSON if needed (Gemini might wrap in ```json)
+                const jsonStr = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                return JSON.parse(jsonStr);
+
+            } catch (e) {
+                console.error("API Failed", e);
+                // Fallback Logic (Only for Text if available, otherwise generic)
+                if (userText) {
+                    // Rule-Based Logic (Fallback) WITH CONTEXT
+                    const lower = userText.toLowerCase();
+                    const lastSantaMsg = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].text : "";
+
+                    const wasAskedAboutTarget = lastSantaMsg.includes('エルサ') || lastSantaMsg.includes('プリンセス') || lastSantaMsg.includes('ドレス');
+
+                    // 1. Correct Answer triggers
+                    if (lower.includes("エルサ") || lower.includes("ドレス") || lower.includes("frozen") || lower.includes("dress")) {
+                        return { text: "おお！そうだ、エルサのドレスだったね！", success: true };
+                    }
+                    // 2. Common Wrong Answers (Guiding)
+                    if (lower.includes("鞄") || lower.includes("かばん") || lower.includes("bag") ||
+                        lower.includes("おもちゃ") || lower.includes("toy") || lower.includes("game")) {
+                        return { text: "え？本当に？ピカピカの青いドレス（アナ雪）じゃなかったっけ？", success: false };
+                    }
+                    // 3. Affirmation to previous question
+                    if (lower.includes("うん") || lower.includes("はい") || lower.includes("yes")) {
+                        // We assume this might be a confirmation to "Did you want a dress?"
+                        return { text: "よし、わかった！プレゼントをあげよう！", success: true };
+                    }
+                }
+                // ---------------------------------------------------------------
+
+                return { text: "ん？ごめんね、ちょっと通信の調子が悪いみたい。もう一度言ってくれる？", success: false };
+            }
+        }
+
+        // --- Boy Interaction ---
+        let boysGiven = { arata: false, takeru: false };
+
+        function checkBoyInteract(id, giftImg) {
+            const boy = document.getElementById(id);
+            if (!boy || boysGiven[id]) return;
+
+            const sRect = document.getElementById('santa').getBoundingClientRect();
+            const bRect = boy.getBoundingClientRect();
+            if (Math.hypot(sRect.x - bRect.x, sRect.y - bRect.y) < 200) {
+                boysGiven[id] = true;
+
+                // Show Overlay for Boy
+                const overlay = document.getElementById('gift-overlay');
+                const content = document.querySelector('.overlay-content');
+
+                // Santa Faces Left in Overlay
+                document.getElementById('overlay-santa').style.transform = 'scaleX(-1)';
+                document.getElementById('overlay-gift').src = 'images/' + giftImg;
+
+                // Update overlay char image
+                const charImg = document.getElementById('overlay-miyako');
+                charImg.src = boy.querySelector('img').src;
+                charImg.style.transform = 'none';
+
+                overlay.classList.add('show');
+                content.style.transform = 'scale(1.2)';
+
+                setTimeout(() => {
+                    overlay.classList.remove('show');
+
+                    // Add gift icon to boy
+                    const gift = document.createElement('div');
+                    gift.style.position = 'absolute';
+                    gift.style.left = '0'; gift.style.top = '-50%';
+                    gift.style.width = '100px';
+                    gift.innerHTML = `<img src="images/${giftImg}">`;
+                    boy.appendChild(gift);
+
+                    // Add Sway Animation
+                    boy.classList.add('sway');
+
+                    // Check Finale
+                    if (boysGiven.arata && boysGiven.takeru) {
+                        setTimeout(triggerFinale, 1000);
+                    }
+                }, 3000);
+            }
+        }
+
+        function triggerFinale() {
+            // SVG Arched Text
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("width", "100%");
+            svg.setAttribute("height", "100%");
+            svg.style.position = "absolute";
+            svg.style.top = "0";
+            svg.style.left = "0";
+            svg.style.pointerEvents = "none";
+            svg.style.zIndex = "2000";
+
+            // Define Path
+            const defs = document.createElementNS(svgNS, "defs");
+            const path = document.createElementNS(svgNS, "path");
+            path.setAttribute("id", "archPath");
+            // A curve from left to right, arching up near top (e.g. y=150)
+            // M 10%,300 Q 50%,100 90%,300
+            path.setAttribute("d", `M ${window.innerWidth * 0.1},300 Q ${window.innerWidth / 2},50 ${window.innerWidth * 0.9},300`);
+            defs.appendChild(path);
+            svg.appendChild(defs);
+
+            const text = document.createElementNS(svgNS, "text");
+            text.setAttribute("font-family", "Mountains of Christmas");
+            text.setAttribute("font-size", "160"); // DOUBLE SIZE
+            text.setAttribute("fill", "white"); // White text
+            text.setAttribute("font-weight", "bold");
+            text.setAttribute("text-anchor", "middle"); // Center align
+
+            // Text Shadow effect via filter or simple duplicate? SVG filter is complex. 
+            // Let's just use CSS for shadow on the SVG text provided supported browser or stroke.
+            text.setAttribute("stroke", "black");
+            text.setAttribute("stroke-width", "2");
+
+            const textPath = document.createElementNS(svgNS, "textPath");
+            textPath.setAttributeNS("http://www.w3.org/1999/xlink", "href", "#archPath");
+            textPath.setAttribute("startOffset", "50%");
+            textPath.textContent = "Merry Christmas!";
+
+            text.appendChild(textPath);
+            svg.appendChild(text);
+            container.appendChild(svg);
+
+            state = 'FINALE';
+            // No auto-remove? User didn't ask to remove. 
+            // But previous code removed it. "Merry Christmas! ... -> FINALE state".
+            // Finale state makes Santa fly away. 
+            // Let's keep the text on screen while Santa flies away.
+        }
+
+        function updatePos(id, pos, scale = 1) {
+            document.getElementById(id).style.transform = `translate(${pos.x}px, ${pos.y}px) scale(${scale})`;
+        }
+
+        function triggerGiftSequence() {
+            const overlay = document.getElementById('gift-overlay');
+            const content = document.querySelector('.overlay-content');
+
+            // Setup Overlay (Santa faces Left)
+            // Note: We need to ensure overlay-santa ID exists. Default was just img src.
+            // Check HTML structure below to confirm ID. Assuming I need to add ID to overlay images.
+            // Wait, I need to check HTML structure of overlay first or simply select by index.
+            // HTML: <img src="images/santa2you.png" class="overlay-char"> <img id="overlay-gift"> <img id="overlay-miyako">
+            // So Santa is the first .overlay-char.
+            const santaImg = document.querySelector('.overlay-content img:first-child');
+            santaImg.id = 'overlay-santa'; // Assign ID for safety
+            santaImg.style.transform = 'scaleX(-1)';
+
+            document.getElementById('overlay-gift').src = 'images/presentBox1.png';
+            document.getElementById('overlay-miyako').src = 'images/Miyako.png';
+
+            overlay.classList.add('show');
+            content.style.transform = 'scale(1.2)';
+
+            // Step 1: Wait 1s
+            setTimeout(() => {
+                // Step 2: Box Disappears/Opens -> Dress Appears
+                const giftImg = document.getElementById('overlay-gift');
+                // visual change
+                giftImg.src = 'images/ELSADress.png';
+                giftImg.style.transition = 'transform 1s, opacity 0.5s';
+                giftImg.style.transform = 'translateY(-50px) scale(1.5)';
+
+                // Step 3: Miyako Lifts logic (implied by dress moving up)
+                setTimeout(() => {
+                    const mImg = document.getElementById('overlay-miyako');
+                    mImg.style.transition = 'transform 1s';
+                    mImg.style.transform = 'rotateY(360deg)';
+
+                    setTimeout(() => {
+                        mImg.src = 'images/MiyakoElsa.png';
+                        // Update game object real Miyako
+                        const realMiyakoImg = miyako.querySelector('img');
+                        realMiyakoImg.src = 'images/MiyakoElsa.png';
+
+                        setTimeout(() => {
+                            overlay.classList.remove('show');
+
+                            // START SPIN
+                            startMiyakoSpin();
+
+                            // State: HOVER (Santa waits)
+                            state = 'FINALE_HOVER';
+                            createChar('arata', 'images/Arata.png', 30, 80);
+                            createChar('takeru', 'images/Takeru.png', 60, 80);
+
+                            // Transition to INTERACT after 4 seconds
+                            setTimeout(() => {
+                                state = 'FINALE_INTERACT';
+                            }, 4000);
+
+                        }, 2000);
+                    }, 500);
+                }, 1500);
+            }, 1000);
+        }
+
+        function startMiyakoSpin() {
+            // Move Miyako to TreeHouse Door Position (approx 50%, 40%)
+            const containerRect = container.getBoundingClientRect();
+            miyako.style.left = (containerRect.width / 2) + 'px';
+            miyako.style.top = (containerRect.height * 0.4) + 'px';
+
+            // Correct Aspect Ratio for the spin animation (fix "vertical compression")
+            miyako.style.height = '230px';
+            miyako.style.width = '140px';
+
+            // Replace IMG with Div for Sprite Anim to animate `miyako_4dirDress.png`
+            // Assuming the sprite sheet is 4 frames horizontal.
+            miyako.innerHTML = '<div id="miyako-sprite" style="width:100%; height:100%; background: url(images/miyako_4dirDress.png) no-repeat; background-size: 400% 100%;"></div>';
+
+            let frame = 0;
+            // Spin loop (4 frames)
+            setInterval(() => {
+                frame = (frame + 1) % 4;
+                // 140px width * 4 = 560px
+                const offset = frame * -140;
+                document.getElementById('miyako-sprite').style.backgroundPosition = `${offset}px 0`;
+            }, 200);
+        }
+
+        function startFinalePrep() {
+            createChar('arata', 'images/Arata.png', 30, 80);
+            createChar('takeru', 'images/Takeru.png', 60, 80);
+            state = 'FINALE_INTERACT';
+        }
+
+        function startFinale() {
+            createChar('arata', 'images/Arata.png', 30, 80);
+            createChar('takeru', 'images/Takeru.png', 60, 80);
+            state = 'FINALE_INTERACT';
+        }
+
+        function createChar(id, src, x, y) {
+            const el = document.createElement('div');
+            el.id = id;
+            el.className = 'game-object';
+            el.style.left = x + '%';
+            el.style.top = y + '%';
+            el.style.width = '140px'; // Larger
+            el.style.height = '180px';
+            el.innerHTML = `<img src="${src}">`;
+            document.getElementById('game-area').appendChild(el);
+            return el;
+        }
+
+        function createStars() {
+            if (Math.random() > 0.1) return;
+            const star = document.createElement('div');
+            star.className = 'sparkle';
+            star.style.position = 'absolute';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.top = Math.random() * 100 + '%';
+            star.style.width = (2 + Math.random() * 3) + 'px';
+            star.style.height = star.style.width;
+            star.style.background = 'white';
+            star.style.borderRadius = '50%';
+            star.style.pointerEvents = 'none';
+            document.getElementById('game-container').appendChild(star);
+            setTimeout(() => star.remove(), 1000);
+        }
+    </script>
+</body>
+
+</html>
