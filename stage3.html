@@ -358,9 +358,9 @@
         let apiKey = localStorage.getItem('gemini_api_key');
 
         // Santa Physics
-        let reindeerPos = { x: -300, y: 100 };
-        let sleighPos = { x: -400, y: 100 };
-        let santaPos = { x: -500, y: 100 };
+        let reindeerPos = { x: -300, y: 100, angle: 0 };
+        let sleighPos = { x: -400, y: 100, angle: 0 };
+        let santaPos = { x: -500, y: 100, angle: 0 };
 
         // Animals (Background) - Resized 2x (approx 120px)
         const animals = [
@@ -598,17 +598,55 @@
             }
 
             if (state === 'SANTA_ENTER' || state === 'FINALE' || state === 'FINALE_INTERACT' || state === 'FINALE_HOVER') {
-                const smoothing = 0.05;
-                reindeerPos.x += (targetX - reindeerPos.x) * smoothing;
-                reindeerPos.y += (targetY - reindeerPos.y) * smoothing;
-                sleighPos.x += (reindeerPos.x - sleighPos.x - 120) * smoothing; // Offset adjust
-                sleighPos.y += (reindeerPos.y - sleighPos.y) * smoothing;
-                santaPos.x += (sleighPos.x - santaPos.x - 100) * smoothing;
-                santaPos.y += (sleighPos.y - santaPos.y) * smoothing;
 
-                updatePos('reindeer', reindeerPos, currentScale);
-                updatePos('sleigh', sleighPos, currentScale);
-                updatePos('santa', santaPos, currentScale);
+                // Lerp Factors (Distinct for "Snake" feel)
+                const reindeerLerp = 0.1;
+                const sleighLerp = 0.05;
+                const santaLerp = 0.03;
+
+                // 1. Reindeer follows Target
+                reindeerPos.x += (targetX - reindeerPos.x) * reindeerLerp;
+                reindeerPos.y += (targetY - reindeerPos.y) * reindeerLerp;
+                reindeerPos.angle = Math.atan2(targetY - reindeerPos.y, targetX - reindeerPos.x) * 180 / Math.PI;
+
+                // 2. Sleigh follows Reindeer
+                // Offset calculation (approx 120px behind) is natural with Lerp delay, but let's just follow position for snake chain
+                // In stage2 we used (reindeerPos.x - sleighPos.x) * sleighLerp
+                sleighPos.x += (reindeerPos.x - sleighPos.x) * sleighLerp;
+                sleighPos.y += (reindeerPos.y - sleighPos.y) * sleighLerp;
+                sleighPos.angle = Math.atan2(reindeerPos.y - sleighPos.y, reindeerPos.x - sleighPos.x) * 180 / Math.PI;
+
+                // 3. Santa follows Sleigh
+                santaPos.x += (sleighPos.x - santaPos.x) * santaLerp;
+                santaPos.y += (sleighPos.y - santaPos.y) * santaLerp;
+                santaPos.angle = Math.atan2(sleighPos.y - santaPos.y, sleighPos.x - santaPos.x) * 180 / Math.PI;
+
+
+                // Dynamic Sizing Logic (Rubberband)
+                const maxDist = 800; // Larger range for Stage 3 resolution
+                const minDynScale = 0.6;
+                const maxDynScale = 1.0;
+
+                // Reindeer dist from target
+                const rDist = Math.hypot(targetX - reindeerPos.x, targetY - reindeerPos.y);
+                let rScale = Math.max(minDynScale, maxDynScale - (rDist / maxDist) * 0.4);
+
+                // Sleigh dist from Reindeer
+                const sDist = Math.hypot(reindeerPos.x - sleighPos.x, reindeerPos.y - sleighPos.y);
+                let sScale = Math.max(minDynScale, maxDynScale - (sDist / maxDist) * 0.5);
+
+                // Santa dist from Sleigh
+                const stDist = Math.hypot(sleighPos.x - santaPos.x, sleighPos.y - santaPos.y);
+                let stScale = Math.max(minDynScale, maxDynScale - (stDist / maxDist) * 0.6);
+
+                // Combine with Global Finale Scale
+                rScale *= currentScale;
+                sScale *= currentScale;
+                stScale *= currentScale;
+
+                updatePos('reindeer', reindeerPos, rScale);
+                updatePos('sleigh', sleighPos, sScale);
+                updatePos('santa', santaPos, stScale);
 
                 // Collision Check (Santa touches Miyako) - Adjusted for size (2x -> 200px threshold)
                 if (state === 'SANTA_ENTER') {
@@ -1096,7 +1134,42 @@
         }
 
         function updatePos(id, pos, scale = 1) {
-            document.getElementById(id).style.transform = `translate(${pos.x}px, ${pos.y}px) scale(${scale})`;
+            // Include rotation if available
+            const rot = pos.angle ? pos.angle : 0;
+            // Flip Santa image if needed? Or just rotate?
+            // "reindeer2.png" etc face RIGHT by default usually. 
+            // If they face LEFT in image, we might need offset.
+            // Assuming they face LEFT (like previous stages seemingly implied with negative scales sometimes).
+            // Actually stage2 used `scaleX(-1)` for some overlays. 
+            // In Stage 2 code: `rotate(${rAngle}deg)` was used.
+            // Let's rely on rotation. 
+            // However, if the image faces LEFT, and we move RIGHT (Angle 0), we want it to look RIGHT.
+            // If image faces LEFT, Angle 0 (Right) means we need to rotate 180 or flip.
+            // Let's assume standard behavior for now, if it's backwards we fix it.
+            // Actually, `reindeer2.png` in Stage 3 init was scale(1).
+
+            // Correction: If the images are standard "facing left" images, and we move right (0 deg), 
+            // `rotate(0deg)` keeps them facing left. 
+            // `Math.atan2` returns 0 for Right. 
+            // So if I move Right, I get 0 deg. The image stays Left. Bad.
+            // I should probably add 180 degrees if the source image faces Left?
+            // Or `scaleX(-1)` if moving right?
+            // Stage 2 code: `rotate(${rAngle}deg)`. It didn't seem to add offsets.
+            // Let's stick thereto.
+
+            // Correction 2: In Stage 2, Update Loop:
+            // const rAngle = Math.atan2(...) * 180 / Math.PI;
+            // reindeer.style.transform = `... rotate(${rAngle}deg) ...`
+
+            // If this Logic worked in Stage 2, I will copy it.
+
+            // But wait! in Stage 3, check `reindeerPos.x += ...`.
+            // Stage 2: `reindeerPos.x += (lastMousePos.x - reindeerPos.x - 50) ...`
+            // Stage 3: `reindeerPos.x += (targetX - reindeerPos.x) ...`
+            // Logic is same.
+
+            // BUT: My `updatePos` implementation needs to handle the rotate property.
+            document.getElementById(id).style.transform = `translate(${pos.x}px, ${pos.y}px) rotate(${rot}deg) scale(${scale})`;
         }
 
         function triggerGiftSequence() {
