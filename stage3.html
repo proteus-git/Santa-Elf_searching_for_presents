@@ -481,34 +481,44 @@
             const climb = setInterval(() => {
                 top += containerRect.height * 0.005; // 相対的な移動量
                 miyako.style.top = top + 'px';
-                if (top >= containerRect.height * 0.85) { // Ground level 0.85
+                if (top >= containerRect.height * 0.70) { // Ground level 0.70 (Higher up)
                     clearInterval(climb);
                     clearInterval(frameInterval); // アニメーション停止
                     miyakoImg.src = 'images/Miyako.png'; // 最終フレームを通常画像に
                     state = 'MIYAKO_ACTIVE';
+
+                    // Initialize Wandering Target
+                    wanderTargetX = miyako.style.left ? parseFloat(miyako.style.left) : (containerRect.width / 2);
+
                     setTimeout(() => { state = 'SANTA_ENTER'; }, 1000);
                 }
             }, 20);
         }
 
+        let wanderTargetX = 0;
+        let wanderTimer = 0;
+
         function loop(timestamp) {
             // MIYAKO Logic
             if (state === 'MIYAKO_ACTIVE' || state === 'SANTA_ENTER') {
                 const containerRect = container.getBoundingClientRect();
-                const mx = mouse.x;
-                // const my = Math.min(mouse.y, containerRect.height * 0.85);
 
-                // 現在の位置を取得（ゲームコンテナ相対）
+                // Wandering Logic (Autonomous)
+                if (timestamp - wanderTimer > 3000) { // Change target every 3 seconds
+                    wanderTimer = timestamp;
+                    // Random target between 10% and 90% width
+                    wanderTargetX = (0.1 + Math.random() * 0.8) * containerRect.width;
+                }
+
+                // 現在の位置を取得
                 const currentLeft = parseFloat(miyako.style.left) || containerRect.width / 2;
-                // const currentTop = parseFloat(miyako.style.top) || containerRect.height * 0.4;
-                const groundY = containerRect.height * 0.85;
+                const groundY = containerRect.height * 0.70; // Fixed Ground Y (Higher)
 
-                // マウスに向かって滑らかに移動 (X ONLY)
-                const newLeft = currentLeft + (mx - currentLeft) * 0.05;
-                // const newTop = currentTop + (my - currentTop) * 0.05;
+                // Smoothly move towards wander target
+                const newLeft = currentLeft + (wanderTargetX - currentLeft) * 0.02; // Slow wander speed
 
                 miyako.style.left = newLeft + 'px';
-                miyako.style.top = groundY + 'px'; // Fixed Ground Y
+                miyako.style.top = groundY + 'px';
             }
 
             // Santa Logic
@@ -989,6 +999,10 @@
             const bRect = boy.getBoundingClientRect();
             if (Math.hypot(sRect.x - bRect.x, sRect.y - bRect.y) < 200) {
                 boysGiven[id] = true;
+
+                // Speak!
+                if (id === 'arata') speak("あらたくんも！プレゼントだよ！");
+                if (id === 'takeru') speak("たけるくんも！プレゼントだよ！");
 
                 // Show Overlay for Boy
                 const overlay = document.getElementById('gift-overlay');
